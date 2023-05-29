@@ -257,6 +257,7 @@ test-suite cardano-api-test
                       , hedgehog
                       , hedgehog-extras ^>= 0.4.3
                       , hedgehog-quickcheck
+                      , interpolatedstring-perl6
                       , mtl
                       , microlens
                       , QuickCheck
@@ -272,6 +273,7 @@ test-suite cardano-api-test
                         Test.Cardano.Api.KeysByron
                         Test.Cardano.Api.Ledger
                         Test.Cardano.Api.Metadata
+                        Test.Cardano.Api.SerialiseTextEnvelope
                         Test.Cardano.Api.Typed.Address
                         Test.Cardano.Api.Typed.Bech32
                         Test.Cardano.Api.Typed.CBOR
