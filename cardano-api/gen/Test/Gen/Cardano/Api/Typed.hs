@@ -713,10 +713,10 @@ genFeatureValueInEra :: ()
   => Alternative f
   => f a
   -> CardanoEra era
-  -> f (FeatureValue feature era a)
+  -> f (FeatureValue a feature era)
 genFeatureValueInEra gen =
   featureInEra (pure NoFeatureValue) $ \witness ->
-    pure NoFeatureValue <|> fmap (FeatureValue witness) gen
+    pure NoFeatureValue <|> (FeatureValue <$> gen <*> pure witness)
 
 genTxScriptValidity :: CardanoEra era -> Gen (TxScriptValidity era)
 genTxScriptValidity era = case txScriptValiditySupportedInCardanoEra era of
