@@ -79,6 +79,7 @@ module Cardano.Api.ProtocolParameters (
   ) where
 
 import           Cardano.Api.Address
+import           Cardano.Api.EraCast
 import           Cardano.Api.Eras
 import           Cardano.Api.Error
 import           Cardano.Api.Feature
@@ -140,7 +141,7 @@ import           Text.PrettyBy.Default (display)
 --
 -- There are also parameters fixed in the Genesis file. See 'GenesisParameters'.
 --
-data ProtocolParameters =
+data ProtocolParameters era =
      ProtocolParameters {
 
        -- | Protocol version, major and minor. Updating the major version is
@@ -303,7 +304,38 @@ data ProtocolParameters =
     }
   deriving (Eq, Generic, Show)
 
-instance FromJSON ProtocolParameters where
+instance EraCastLossy ProtocolParameters where
+  eraCastLossy _era pp =
+    ProtocolParameters
+    { protocolParamProtocolVersion = protocolParamProtocolVersion pp
+    , protocolParamDecentralization = protocolParamDecentralization pp
+    , protocolParamExtraPraosEntropy = protocolParamExtraPraosEntropy pp
+    , protocolParamMaxBlockHeaderSize = protocolParamMaxBlockHeaderSize pp
+    , protocolParamMaxBlockBodySize = protocolParamMaxBlockBodySize pp
+    , protocolParamMaxTxSize = protocolParamMaxTxSize pp
+    , protocolParamTxFeeFixed = protocolParamTxFeeFixed pp
+    , protocolParamTxFeePerByte = protocolParamTxFeePerByte pp
+    , protocolParamMinUTxOValue = protocolParamMinUTxOValue pp
+    , protocolParamStakeAddressDeposit = protocolParamStakeAddressDeposit pp
+    , protocolParamStakePoolDeposit = protocolParamStakePoolDeposit pp
+    , protocolParamMinPoolCost = protocolParamMinPoolCost pp
+    , protocolParamPoolRetireMaxEpoch = protocolParamPoolRetireMaxEpoch pp
+    , protocolParamStakePoolTargetNum = protocolParamStakePoolTargetNum pp
+    , protocolParamPoolPledgeInfluence = protocolParamPoolPledgeInfluence pp
+    , protocolParamMonetaryExpansion = protocolParamMonetaryExpansion pp
+    , protocolParamTreasuryCut = protocolParamTreasuryCut pp
+    , protocolParamUTxOCostPerWord = protocolParamUTxOCostPerWord pp
+    , protocolParamCostModels = protocolParamCostModels pp
+    , protocolParamPrices = protocolParamPrices pp
+    , protocolParamMaxTxExUnits = protocolParamMaxTxExUnits pp
+    , protocolParamMaxBlockExUnits = protocolParamMaxBlockExUnits pp
+    , protocolParamMaxValueSize = protocolParamMaxValueSize pp
+    , protocolParamCollateralPercent = protocolParamCollateralPercent pp
+    , protocolParamMaxCollateralInputs = protocolParamMaxCollateralInputs pp
+    , protocolParamUTxOCostPerByte = protocolParamUTxOCostPerByte pp
+    }
+
+instance FromJSON (ProtocolParameters era) where
   parseJSON =
     withObject "ProtocolParameters" $ \o -> do
       v <- o .: "protocolVersion"
@@ -335,7 +367,7 @@ instance FromJSON ProtocolParameters where
         <*> o .:? "maxCollateralInputs"
         <*> o .:? "utxoCostPerByte"
 
-instance ToJSON ProtocolParameters where
+instance ToJSON (ProtocolParameters era) where
   toJSON ProtocolParameters{..} =
     object
       [ "extraPraosEntropy"   .= protocolParamExtraPraosEntropy
@@ -1256,16 +1288,16 @@ fromConwayPParamsUpdate = fromBabbagePParamsUpdate
 -- (which may be the case for some code paths).
 data BundledProtocolParameters era where
   BundleAsByronProtocolParameters
-    :: ProtocolParameters
+    :: ProtocolParameters ByronEra
     -> BundledProtocolParameters ByronEra
   BundleAsShelleyBasedProtocolParameters
     :: ShelleyBasedEra era
-    -> ProtocolParameters
+    -> ProtocolParameters era
     -> Ledger.PParams (ShelleyLedgerEra era)
     -> BundledProtocolParameters era
 
 bundleProtocolParams :: CardanoEra era
-                     -> ProtocolParameters
+                     -> ProtocolParameters era
                      -> Either ProtocolParametersConversionError (BundledProtocolParameters era)
 bundleProtocolParams cEra pp = case cardanoEraStyle cEra of
   LegacyByronEra -> pure $ BundleAsByronProtocolParameters pp
@@ -1283,7 +1315,7 @@ unbundleLedgerShelleyBasedProtocolParams = \case
   ShelleyBasedEraBabbage -> \(BundleAsShelleyBasedProtocolParameters _ _ lpp) -> lpp
   ShelleyBasedEraConway -> \(BundleAsShelleyBasedProtocolParameters _ _ lpp) -> lpp
 
-unbundleProtocolParams :: BundledProtocolParameters era -> ProtocolParameters
+unbundleProtocolParams :: BundledProtocolParameters era -> ProtocolParameters era
 unbundleProtocolParams (BundleAsByronProtocolParameters pp) = pp
 unbundleProtocolParams (BundleAsShelleyBasedProtocolParameters _ pp _) = pp
 
@@ -1293,7 +1325,7 @@ unbundleProtocolParams (BundleAsShelleyBasedProtocolParameters _ pp _) = pp
 
 toLedgerPParams
   :: ShelleyBasedEra era
-  -> ProtocolParameters
+  -> ProtocolParameters era
   -> Either ProtocolParametersConversionError (Ledger.PParams (ShelleyLedgerEra era))
 toLedgerPParams ShelleyBasedEraShelley = toShelleyPParams
 toLedgerPParams ShelleyBasedEraAllegra = toShelleyPParams
@@ -1304,7 +1336,7 @@ toLedgerPParams ShelleyBasedEraConway  = toConwayPParams
 
 
 toShelleyCommonPParams :: EraPParams ledgerera
-                       => ProtocolParameters
+                       => ProtocolParameters era
                        -> Either ProtocolParametersConversionError (PParams ledgerera)
 toShelleyCommonPParams
     ProtocolParameters {
@@ -1349,7 +1381,7 @@ toShelleyPParams :: ( EraPParams ledgerera
                     , Ledger.AtMostEra Ledger.MaryEra ledgerera
                     , Ledger.AtMostEra Ledger.AlonzoEra ledgerera
                     )
-                 => ProtocolParameters
+                 => ProtocolParameters era
                  -> Either ProtocolParametersConversionError (PParams ledgerera)
 toShelleyPParams
     protocolParameters@ProtocolParameters {
@@ -1369,7 +1401,7 @@ toShelleyPParams
 
 
 toAlonzoCommonPParams :: AlonzoEraPParams ledgerera
-                      => ProtocolParameters
+                      => ProtocolParameters era
                       -> Either ProtocolParametersConversionError (PParams ledgerera)
 toAlonzoCommonPParams
     protocolParameters@ProtocolParameters {
@@ -1407,7 +1439,7 @@ toAlonzoCommonPParams
   pure ppAlonzoCommon
 
 toAlonzoPParams :: Ledger.Crypto crypto
-                => ProtocolParameters
+                => ProtocolParameters era
                 -> Either ProtocolParametersConversionError (PParams (Ledger.AlonzoEra crypto))
 toAlonzoPParams
     protocolParameters@ProtocolParameters {
@@ -1441,7 +1473,7 @@ toAlonzoPParams
 
 
 toBabbagePParams :: BabbageEraPParams ledgerera
-                 => ProtocolParameters
+                 => ProtocolParameters era
                  -> Either ProtocolParametersConversionError (PParams ledgerera)
 toBabbagePParams
     protocolParameters@ProtocolParameters {
@@ -1456,7 +1488,7 @@ toBabbagePParams
   pure ppBabbage
 
 toConwayPParams :: BabbageEraPParams ledgerera
-                => ProtocolParameters
+                => ProtocolParameters era
                 -> Either ProtocolParametersConversionError (PParams ledgerera)
 toConwayPParams = toBabbagePParams
 
@@ -1467,7 +1499,7 @@ toConwayPParams = toBabbagePParams
 fromLedgerPParams
   :: ShelleyBasedEra era
   -> Ledger.PParams (ShelleyLedgerEra era)
-  -> ProtocolParameters
+  -> ProtocolParameters era
 fromLedgerPParams ShelleyBasedEraShelley = fromShelleyPParams
 fromLedgerPParams ShelleyBasedEraAllegra = fromShelleyPParams
 fromLedgerPParams ShelleyBasedEraMary    = fromShelleyPParams
@@ -1478,7 +1510,7 @@ fromLedgerPParams ShelleyBasedEraConway  = fromConwayPParams
 
 fromShelleyCommonPParams :: EraPParams ledgerera
                          => PParams ledgerera
-                         -> ProtocolParameters
+                         -> ProtocolParameters era
 fromShelleyCommonPParams pp =
     ProtocolParameters {
       protocolParamProtocolVersion     = case pp ^. ppProtocolVersionL of
@@ -1515,7 +1547,7 @@ fromShelleyPParams :: ( EraPParams ledgerera
                       , Ledger.AtMostEra Ledger.AlonzoEra ledgerera
                       )
                    => PParams ledgerera
-                   -> ProtocolParameters
+                   -> ProtocolParameters era
 fromShelleyPParams pp =
   (fromShelleyCommonPParams pp) {
       protocolParamDecentralization    = Just . Ledger.unboundRational $ pp ^. ppDL
@@ -1526,7 +1558,7 @@ fromShelleyPParams pp =
 
 fromAlonzoCommonPParams :: AlonzoEraPParams ledgerera
                         => PParams ledgerera
-                        -> ProtocolParameters
+                        -> ProtocolParameters era
 fromAlonzoCommonPParams pp =
   (fromShelleyCommonPParams pp) {
       protocolParamCostModels          = fromAlonzoCostModels $ pp ^. ppCostModelsL
@@ -1541,7 +1573,7 @@ fromAlonzoCommonPParams pp =
 
 fromAlonzoPParams :: Ledger.Crypto crypto
                   => PParams (Ledger.AlonzoEra crypto)
-                  -> ProtocolParameters
+                  -> ProtocolParameters era
 fromAlonzoPParams pp =
   (fromAlonzoCommonPParams pp) {
     protocolParamUTxOCostPerWord = Just . fromShelleyLovelace . unCoinPerWord $
@@ -1550,7 +1582,7 @@ fromAlonzoPParams pp =
 
 fromBabbagePParams :: BabbageEraPParams ledgerera
                    => PParams ledgerera
-                   -> ProtocolParameters
+                   -> ProtocolParameters era
 fromBabbagePParams pp =
   (fromAlonzoCommonPParams pp) {
     protocolParamUTxOCostPerByte = Just . fromShelleyLovelace . unCoinPerByte $
@@ -1559,13 +1591,13 @@ fromBabbagePParams pp =
 
 fromConwayPParams :: BabbageEraPParams ledgerera
                   => PParams ledgerera
-                  -> ProtocolParameters
+                  -> ProtocolParameters era
 fromConwayPParams = fromBabbagePParams
 
 checkProtocolParameters
   :: forall era. IsCardanoEra era
   => ShelleyBasedEra era
-  -> ProtocolParameters
+  -> ProtocolParameters era
   -> Either ProtocolParametersError ()
 checkProtocolParameters sbe ProtocolParameters{..} =
   case sbe of

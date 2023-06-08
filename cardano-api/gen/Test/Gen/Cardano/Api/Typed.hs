@@ -846,7 +846,7 @@ genPraosNonce = makePraosNonce <$> Gen.bytes (Range.linear 0 32)
 genMaybePraosNonce :: Gen (Maybe PraosNonce)
 genMaybePraosNonce = Gen.maybe genPraosNonce
 
-genProtocolParameters :: CardanoEra era -> Gen ProtocolParameters
+genProtocolParameters :: CardanoEra era -> Gen (ProtocolParameters era)
 genProtocolParameters era = do
   protocolParamProtocolVersion <- (,) <$> genNat <*> genNat
   protocolParamDecentralization <- Gen.maybe genRational
@@ -880,7 +880,7 @@ genProtocolParameters era = do
   pure ProtocolParameters {..}
 
 -- | Generate valid protocol parameters which pass validations in Cardano.Api.ProtocolParameters
-genValidProtocolParameters :: CardanoEra era -> Gen ProtocolParameters
+genValidProtocolParameters :: CardanoEra era -> Gen (ProtocolParameters era)
 genValidProtocolParameters era =
   ProtocolParameters
     <$> ((,) <$> genNat <*> genNat)

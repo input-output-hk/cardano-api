@@ -79,6 +79,12 @@ instance
       (\fe -> FeatureValue <$> parseJSON v <*> pure fe)
       cardanoEra
 
+instance FeatureInEra feature => EraCastLossy (FeatureValue a feature) where
+  eraCastLossy era fv =
+    case fv of
+      FeatureValue a _ -> featureInEra NoFeatureValue (FeatureValue a) era
+      NoFeatureValue -> NoFeatureValue
+
 (.:?^) :: (IsCardanoEra era, FromJSON a, FeatureInEra feature) => Object -> Key -> Parser (FeatureValue a feature era)
 (.:?^) = explicitParseFieldFeatureValue parseJSON
 
@@ -103,12 +109,6 @@ explicitParseFieldFeatureValue p obj key =
         , " is not valid for the era " <> show era <> "."
         ]
     parseSupported v fe = FeatureValue <$> p v <*> pure fe
-
-instance FeatureInEra feature => EraCastLossy (FeatureValue a feature) where
-  eraCastLossy era fv =
-    case fv of
-      FeatureValue a _ -> featureInEra NoFeatureValue (FeatureValue a) era
-      NoFeatureValue -> NoFeatureValue
 
 -- | Determine if a value is defined.
 --

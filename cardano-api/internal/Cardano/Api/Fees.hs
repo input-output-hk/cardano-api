@@ -901,7 +901,7 @@ makeTransactionBodyAutoBalance
      IsShelleyBasedEra era
   => SystemStart
   -> LedgerEpochInfo
-  -> ProtocolParameters
+  -> ProtocolParameters era
   -> Set PoolId       -- ^ The set of registered stake pools, that are being
                       --   unregistered in this transaction.
   -> Map StakeCredential Lovelace
@@ -1062,7 +1062,7 @@ makeTransactionBodyAutoBalance systemstart history pparams poolids stakeDelegDep
    -- TODO: Bug Jared to expose a function from the ledger that returns total and return collateral.
    calcReturnAndTotalCollateral
      :: Lovelace -- ^ Fee
-     -> ProtocolParameters
+     -> ProtocolParameters era -- ^ Protocol parameters
      -> TxInsCollateral era -- ^ From the initial TxBodyContent
      -> TxReturnCollateral CtxTx era -- ^ From the initial TxBodyContent
      -> TxTotalCollateral era -- ^ From the initial TxBodyContent
