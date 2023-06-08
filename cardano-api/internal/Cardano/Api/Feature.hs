@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE LambdaCase #-}
@@ -5,17 +6,20 @@
 {-# LANGUAGE StandaloneDeriving #-}
 
 module Cardano.Api.Feature
-  ( FeatureValue (..)
+  ( FeatureValue(..)
   , FeatureInEra(..)
   , featureInShelleyBasedEra
   , valueOrDefault
   , asFeatureValue
   , asFeatureValueInShelleyBasedEra
   , existsFeatureValue
+  , (.:?^)
   ) where
 
 import           Cardano.Api.Eras
 
+import qualified Data.Aeson.KeyMap as KM
+import           Data.Aeson.Types
 import           Data.Kind
 
 -- | A class for features that are supported in some eras but not others.
@@ -54,6 +58,45 @@ data FeatureValue a feature era where
 
 deriving instance (Eq a, Eq (feature era)) => Eq (FeatureValue a feature era)
 deriving instance (Show a, Show (feature era)) => Show (FeatureValue a feature era)
+
+instance ToJSON a => ToJSON (FeatureValue a feature era) where
+  toJSON v =
+    toJSON $
+      case v of
+        NoFeatureValue -> Nothing
+        FeatureValue a _ -> Just a
+
+instance
+  ( IsCardanoEra era
+  , FromJSON a
+  , FeatureInEra feature
+  ) => FromJSON (FeatureValue a feature era) where
+  parseJSON v =
+    featureInEra
+      (pure NoFeatureValue)
+      (\fe -> FeatureValue <$> parseJSON v <*> pure fe)
+      cardanoEra
+
+(.:?^) :: (IsCardanoEra era, FromJSON a, FeatureInEra feature) => Object -> Key -> Parser (FeatureValue a feature era)
+(.:?^) = explicitParseFieldFeatureValue parseJSON
+
+-- | Variant of '.:!' with explicit parser function.
+explicitParseFieldFeatureValue :: ()
+  => IsCardanoEra era
+  => FeatureInEra feature
+  => (Value -> Parser a)
+  -> Object
+  -> Key
+  -> Parser (FeatureValue a feature era)
+explicitParseFieldFeatureValue p obj key =
+  let era = cardanoEra in
+  case KM.lookup key obj of
+    Nothing -> pure NoFeatureValue
+    Just v ->
+      featureInEra
+        (fail $ "The field " <> show key <> " is not valid for the era " <> show era <> ".")
+        (\fe -> FeatureValue <$> p v <*> pure fe)
+        era
 
 -- | Determine if a value is defined.
 --
