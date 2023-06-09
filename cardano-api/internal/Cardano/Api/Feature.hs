@@ -16,8 +16,10 @@ module Cardano.Api.Feature
   , (.:?^)
   ) where
 
+import           Cardano.Api.EraCast
 import           Cardano.Api.Eras
 
+import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.KeyMap as KM
 import           Data.Aeson.Types
 import           Data.Kind
@@ -89,14 +91,24 @@ explicitParseFieldFeatureValue :: ()
   -> Key
   -> Parser (FeatureValue a feature era)
 explicitParseFieldFeatureValue p obj key =
-  let era = cardanoEra in
   case KM.lookup key obj of
     Nothing -> pure NoFeatureValue
-    Just v ->
-      featureInEra
-        (fail $ "The field " <> show key <> " is not valid for the era " <> show era <> ".")
-        (\fe -> FeatureValue <$> p v <*> pure fe)
-        era
+    Just Aeson.Null -> pure NoFeatureValue
+    Just v -> featureInEra (failUnsupported v) (parseSupported v) era
+  where
+    era = cardanoEra
+    failUnsupported v =
+      fail $ mconcat
+        [ "The field " <> show key <> " with value " <> show v
+        , " is not valid for the era " <> show era <> "."
+        ]
+    parseSupported v fe = FeatureValue <$> p v <*> pure fe
+
+instance FeatureInEra feature => EraCastLossy (FeatureValue a feature) where
+  eraCastLossy era fv =
+    case fv of
+      FeatureValue a _ -> featureInEra NoFeatureValue (FeatureValue a) era
+      NoFeatureValue -> NoFeatureValue
 
 -- | Determine if a value is defined.
 --
