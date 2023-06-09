@@ -11,7 +11,7 @@ module Cardano.Api.Feature
   , valueOrDefault
   , asFeatureValue
   , asFeatureValueInShelleyBasedEra
-  , isFeatureValue
+  , existsFeatureValue
   ) where
 
 import           Cardano.Api.Eras
@@ -59,8 +59,8 @@ deriving instance (Show a, Show (feature era)) => Show (FeatureValue a feature e
 --
 -- If the value is not defined, it could be because the feature is not supported or
 -- because the feature is supported but the value is not available.
-isFeatureValue :: FeatureValue a feature era -> Bool
-isFeatureValue = \case
+existsFeatureValue :: FeatureValue a feature era -> Bool
+existsFeatureValue = \case
   NoFeatureValue -> False
   FeatureValue _ _ -> True
 
