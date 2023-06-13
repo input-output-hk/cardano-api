@@ -707,6 +707,8 @@ module Cardano.Api (
 
     -- ** Protocol related types
     BlockType(..),
+    SomeBlockType (..),
+    reflBlockType,
     Protocol(..),
     ProtocolInfoArgs(..),
 

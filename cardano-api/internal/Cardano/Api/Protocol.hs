@@ -6,9 +6,12 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 
 module Cardano.Api.Protocol
   ( BlockType(..)
+  , SomeBlockType (..)
+  , reflBlockType
   , Protocol(..)
   , ProtocolInfoArgs(..)
   , ProtocolClient(..)
@@ -35,6 +38,8 @@ import qualified Ouroboros.Consensus.Shelley.Ledger.Block as Consensus
 import           Ouroboros.Consensus.Shelley.Node.Praos
 import           Ouroboros.Consensus.Shelley.ShelleyHFC (ShelleyBlockHFC)
 import           Ouroboros.Consensus.Util.IOLike (IOLike)
+
+import           Type.Reflection ((:~:) (..))
 
 class (RunNode blk, IOLike m) => Protocol m blk where
   data ProtocolInfoArgs blk
@@ -147,3 +152,14 @@ data BlockType blk where
 deriving instance Eq (BlockType blk)
 deriving instance Show (BlockType blk)
 
+reflBlockType :: BlockType blk -> BlockType blk' -> Maybe (blk :~: blk')
+reflBlockType ByronBlockType ByronBlockType     = Just Refl
+reflBlockType ShelleyBlockType ShelleyBlockType = Just Refl
+reflBlockType CardanoBlockType CardanoBlockType = Just Refl
+reflBlockType _                _                = Nothing
+
+
+data SomeBlockType where
+  SomeBlockType :: BlockType blk -> SomeBlockType
+
+deriving instance Show SomeBlockType
