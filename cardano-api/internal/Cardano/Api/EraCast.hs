@@ -32,6 +32,6 @@ class EraCast (f :: Type -> Type) where
 -- that is not applicable in the target era is dropped.
 class EraCastLossy (f :: Type -> Type) where
   eraCastLossy :: ()
-    => CardanoEra toEra -- ^ The era to cat=st to
+    => CardanoEra toEra -- ^ The era to cast to
     -> f fromEra -- ^ The value to cast
     -> f toEra

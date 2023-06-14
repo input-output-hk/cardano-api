@@ -2550,7 +2550,7 @@ validateTxBodyContent
   :: ShelleyBasedEra era
   -> TxBodyContent BuildTx era
   -> Either TxBodyError ()
-validateTxBodyContent era txBodContent@TxBodyContent {
+validateTxBodyContent sbe txBodContent@TxBodyContent {
                              txIns,
                              txInsCollateral,
                              txOuts,
@@ -2562,27 +2562,27 @@ validateTxBodyContent era txBodContent@TxBodyContent {
                     [ toAlonzoLanguage (AnyPlutusScriptVersion v)
                     | (_, AnyScriptWitness (PlutusScriptWitness _ v _ _ _ _)) <- witnesses
                     ]
-  in case era of
+  in case sbe of
        ShelleyBasedEraShelley -> do
          validateTxIns txIns
          guardShelleyTxInsOverflow (map fst txIns)
-         validateTxOuts era txOuts
+         validateTxOuts sbe txOuts
          validateMetadata txMetadata
        ShelleyBasedEraAllegra -> do
          validateTxIns txIns
          guardShelleyTxInsOverflow (map fst txIns)
-         validateTxOuts era txOuts
+         validateTxOuts sbe txOuts
          validateMetadata txMetadata
        ShelleyBasedEraMary -> do
          validateTxIns txIns
          guardShelleyTxInsOverflow (map fst txIns)
-         validateTxOuts era txOuts
+         validateTxOuts sbe txOuts
          validateMetadata txMetadata
          validateMintValue txMintValue
        ShelleyBasedEraAlonzo -> do
          validateTxIns txIns
          guardShelleyTxInsOverflow (map fst txIns)
-         validateTxOuts era txOuts
+         validateTxOuts sbe txOuts
          validateMetadata txMetadata
          validateMintValue txMintValue
          validateTxInsCollateral txInsCollateral languages
@@ -2590,14 +2590,14 @@ validateTxBodyContent era txBodContent@TxBodyContent {
        ShelleyBasedEraBabbage -> do
          validateTxIns txIns
          guardShelleyTxInsOverflow (map fst txIns)
-         validateTxOuts era txOuts
+         validateTxOuts sbe txOuts
          validateMetadata txMetadata
          validateMintValue txMintValue
          validateTxInsCollateral txInsCollateral languages
          validateProtocolParameters txProtocolParams languages
        ShelleyBasedEraConway -> do
          validateTxIns txIns
-         validateTxOuts era txOuts
+         validateTxOuts sbe txOuts
          validateMetadata txMetadata
          validateMintValue txMintValue
          validateTxInsCollateral txInsCollateral languages

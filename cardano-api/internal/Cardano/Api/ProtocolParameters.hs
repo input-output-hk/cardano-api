@@ -258,7 +258,7 @@ data ProtocolParameters era =
        -- | Cost in ada per word of UTxO storage.
        --
        -- /Introduced in Alonzo/
-       protocolParamUTxOCostPerWord :: Maybe Lovelace,
+       protocolParamUTxOCostPerWord :: FeatureValue Lovelace ProtocolUTxOCostPerWordFeature era,
 
        -- | Cost models for script languages that use them.
        --
@@ -299,13 +299,13 @@ data ProtocolParameters era =
        -- | Cost in ada per byte of UTxO storage.
        --
        -- /Introduced in Babbage/
-       protocolParamUTxOCostPerByte :: Maybe Lovelace
+       protocolParamUTxOCostPerByte :: FeatureValue Lovelace ProtocolUTxOCostPerByteFeature era
 
     }
   deriving (Eq, Generic, Show)
 
 instance EraCastLossy ProtocolParameters where
-  eraCastLossy _era pp =
+  eraCastLossy era pp =
     ProtocolParameters
     { protocolParamProtocolVersion = protocolParamProtocolVersion pp
     , protocolParamDecentralization = protocolParamDecentralization pp
@@ -324,7 +324,7 @@ instance EraCastLossy ProtocolParameters where
     , protocolParamPoolPledgeInfluence = protocolParamPoolPledgeInfluence pp
     , protocolParamMonetaryExpansion = protocolParamMonetaryExpansion pp
     , protocolParamTreasuryCut = protocolParamTreasuryCut pp
-    , protocolParamUTxOCostPerWord = protocolParamUTxOCostPerWord pp
+    , protocolParamUTxOCostPerWord = eraCastLossy era (protocolParamUTxOCostPerWord pp)
     , protocolParamCostModels = protocolParamCostModels pp
     , protocolParamPrices = protocolParamPrices pp
     , protocolParamMaxTxExUnits = protocolParamMaxTxExUnits pp
@@ -332,10 +332,10 @@ instance EraCastLossy ProtocolParameters where
     , protocolParamMaxValueSize = protocolParamMaxValueSize pp
     , protocolParamCollateralPercent = protocolParamCollateralPercent pp
     , protocolParamMaxCollateralInputs = protocolParamMaxCollateralInputs pp
-    , protocolParamUTxOCostPerByte = protocolParamUTxOCostPerByte pp
+    , protocolParamUTxOCostPerByte = eraCastLossy era (protocolParamUTxOCostPerByte pp)
     }
 
-instance FromJSON (ProtocolParameters era) where
+instance IsCardanoEra era => FromJSON (ProtocolParameters era) where
   parseJSON =
     withObject "ProtocolParameters" $ \o -> do
       v <- o .: "protocolVersion"
@@ -357,7 +357,7 @@ instance FromJSON (ProtocolParameters era) where
         <*> o .: "poolPledgeInfluence"
         <*> o .: "monetaryExpansion"
         <*> o .: "treasuryCut"
-        <*> o .:? "utxoCostPerWord"
+        <*> o .:?^ "utxoCostPerWord"
         <*> (fmap unCostModels <$> o .:? "costModels") .!= Map.empty
         <*> o .:? "executionUnitPrices"
         <*> o .:? "maxTxExecutionUnits"
@@ -365,7 +365,7 @@ instance FromJSON (ProtocolParameters era) where
         <*> o .:? "maxValueSize"
         <*> o .:? "collateralPercentage"
         <*> o .:? "maxCollateralInputs"
-        <*> o .:? "utxoCostPerByte"
+        <*> o .:?^ "utxoCostPerByte"
 
 instance ToJSON (ProtocolParameters era) where
   toJSON ProtocolParameters{..} =
@@ -1126,6 +1126,11 @@ toBabbagePParamsUpdate
 requireParam :: String -> (a -> Either ProtocolParametersConversionError b) -> Maybe a -> Either ProtocolParametersConversionError b
 requireParam paramName = maybe (Left $ PpceMissingParameter paramName)
 
+requireFeatureParam :: String -> (a -> Either ProtocolParametersConversionError b) -> FeatureValue a feature era -> Either ProtocolParametersConversionError b
+requireFeatureParam paramName f fv = case fv of
+  NoFeatureValue -> Left $ PpceMissingParameter paramName
+  FeatureValue v _ -> f v
+
 mkProtVer :: (Natural, Natural) -> Either ProtocolParametersConversionError Ledger.ProtVer
 mkProtVer (majorProtVer, minorProtVer) = maybeToRight (PpceVersionInvalid majorProtVer) $
   (`Ledger.ProtVer` minorProtVer) <$> Ledger.mkVersion majorProtVer
@@ -1464,7 +1469,7 @@ toAlonzoPParams
   --                   (boundRationalEither "D")
   --                   protocolParamDecentralization
   utxoCostPerWord <-
-    requireParam "protocolParamUTxOCostPerWord" Right protocolParamUTxOCostPerWord
+    requireFeatureParam "protocolParamUTxOCostPerWord" Right protocolParamUTxOCostPerWord
   let ppAlonzo =
         ppAlonzoCommon
         & ppDL .~ d
@@ -1481,7 +1486,7 @@ toBabbagePParams
     } = do
   ppAlonzoCommon <- toAlonzoCommonPParams protocolParameters
   utxoCostPerByte <-
-    requireParam "protocolParamUTxOCostPerByte" Right protocolParamUTxOCostPerByte
+    requireFeatureParam "protocolParamUTxOCostPerByte" Right protocolParamUTxOCostPerByte
   let ppBabbage =
         ppAlonzoCommon
         & ppCoinsPerUTxOByteL .~ CoinPerByte (toShelleyLovelace utxoCostPerByte)
@@ -1528,7 +1533,7 @@ fromShelleyCommonPParams pp =
     , protocolParamPoolPledgeInfluence = Ledger.unboundRational (pp ^. ppA0L)
     , protocolParamMonetaryExpansion   = Ledger.unboundRational (pp ^. ppRhoL)
     , protocolParamTreasuryCut         = Ledger.unboundRational (pp ^. ppTauL)
-    , protocolParamUTxOCostPerWord     = Nothing -- Obsolete from Babbage onwards
+    , protocolParamUTxOCostPerWord     = NoFeatureValue -- Obsolete from Babbage onwards
     , protocolParamCostModels          = mempty  -- Only from Alonzo onwards
     , protocolParamPrices              = Nothing -- Only from Alonzo onwards
     , protocolParamMaxTxExUnits        = Nothing -- Only from Alonzo onwards
@@ -1536,7 +1541,7 @@ fromShelleyCommonPParams pp =
     , protocolParamMaxValueSize        = Nothing -- Only from Alonzo onwards
     , protocolParamCollateralPercent   = Nothing -- Only from Alonzo onwards
     , protocolParamMaxCollateralInputs = Nothing -- Only from Alonzo onwards
-    , protocolParamUTxOCostPerByte     = Nothing -- Only from Babbage onwards
+    , protocolParamUTxOCostPerByte     = NoFeatureValue -- Only from Babbage onwards
     , protocolParamDecentralization    = Nothing -- Obsolete from Babbage onwards
     , protocolParamExtraPraosEntropy   = Nothing -- Obsolete from Alonzo onwards
     , protocolParamMinUTxOValue        = Nothing -- Obsolete from Alonzo onwards
@@ -1573,23 +1578,27 @@ fromAlonzoCommonPParams pp =
 
 fromAlonzoPParams :: Ledger.Crypto crypto
                   => PParams (Ledger.AlonzoEra crypto)
-                  -> ProtocolParameters era
+                  -> ProtocolParameters AlonzoEra
 fromAlonzoPParams pp =
   (fromAlonzoCommonPParams pp) {
-    protocolParamUTxOCostPerWord = Just . fromShelleyLovelace . unCoinPerWord $
-                                     pp ^. ppCoinsPerUTxOWordL
+    protocolParamUTxOCostPerWord = FeatureValue (fromShelleyLovelace . unCoinPerWord $ pp ^. ppCoinsPerUTxOWordL) ProtocolUpdateUTxOCostPerWordInAlonzoEra
     }
 
 fromBabbagePParams :: BabbageEraPParams ledgerera
+                   => IsCardanoEra era
                    => PParams ledgerera
                    -> ProtocolParameters era
 fromBabbagePParams pp =
   (fromAlonzoCommonPParams pp) {
-    protocolParamUTxOCostPerByte = Just . fromShelleyLovelace . unCoinPerByte $
-                                     pp ^. ppCoinsPerUTxOByteL
+    protocolParamUTxOCostPerByte =
+      featureInEra
+        NoFeatureValue
+        (FeatureValue (fromShelleyLovelace . unCoinPerByte $ pp ^. ppCoinsPerUTxOByteL))
+        cardanoEra
     }
 
 fromConwayPParams :: BabbageEraPParams ledgerera
+                  => IsCardanoEra era
                   => PParams ledgerera
                   -> ProtocolParameters era
 fromConwayPParams = fromBabbagePParams
@@ -1611,7 +1620,7 @@ checkProtocolParameters sbe ProtocolParameters{..} =
    era :: CardanoEra era
    era = shelleyBasedToCardanoEra sbe
 
-   costPerWord = isJust protocolParamUTxOCostPerWord
+   costPerWord = existsFeatureValue protocolParamUTxOCostPerWord
    cModel = not $ Map.null protocolParamCostModels
    prices = isJust protocolParamPrices
    maxTxUnits = isJust protocolParamMaxTxExUnits
@@ -1619,7 +1628,7 @@ checkProtocolParameters sbe ProtocolParameters{..} =
    maxValueSize = isJust protocolParamMaxValueSize
    collateralPercent = isJust protocolParamCollateralPercent
    maxCollateralInputs = isJust protocolParamMaxCollateralInputs
-   costPerByte = isJust protocolParamUTxOCostPerByte
+   costPerByte = existsFeatureValue protocolParamUTxOCostPerByte
    decentralization = isJust protocolParamDecentralization
    extraPraosEntropy = isJust protocolParamExtraPraosEntropy
 
