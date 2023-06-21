@@ -34,13 +34,12 @@ module Cardano.Api.IO
   , writeSecrets
   ) where
 
-import           Cardano.Api.Error (FileError (..))
+import           Cardano.Api.Error (FileError (..), fileIOExceptT)
 import           Cardano.Api.IO.Base
 import           Cardano.Api.IO.Compat
 
 import           Control.Monad.Except (runExceptT)
 import           Control.Monad.IO.Class (MonadIO (..))
-import           Control.Monad.Trans.Except.Extra (handleIOExceptT)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Char8 as BSC
@@ -54,21 +53,21 @@ readByteStringFile :: ()
   => File content In
   -> m (Either (FileError e) ByteString)
 readByteStringFile fp = runExceptT $
-  handleIOExceptT (FileIOError (unFile fp)) $ BS.readFile (unFile fp)
+  fileIOExceptT (unFile fp) BS.readFile
 
 readLazyByteStringFile :: ()
   => MonadIO m
   => File content In
   -> m (Either (FileError e) LBS.ByteString)
 readLazyByteStringFile fp = runExceptT $
-  handleIOExceptT (FileIOError (unFile fp)) $ LBS.readFile (unFile fp)
+  fileIOExceptT (unFile fp) LBS.readFile
 
 readTextFile :: ()
   => MonadIO m
   => File content In
   -> m (Either (FileError e) Text)
 readTextFile fp = runExceptT $
-  handleIOExceptT (FileIOError (unFile fp)) $ Text.readFile (unFile fp)
+  fileIOExceptT (unFile fp) Text.readFile
 
 writeByteStringFile :: ()
   => MonadIO m
@@ -76,7 +75,7 @@ writeByteStringFile :: ()
   -> ByteString
   -> m (Either (FileError e) ())
 writeByteStringFile fp bs = runExceptT $
-  handleIOExceptT (FileIOError (unFile fp)) $ BS.writeFile (unFile fp) bs
+  fileIOExceptT (unFile fp) (`BS.writeFile` bs)
 
 writeByteStringFileWithOwnerPermissions
   :: FilePath
@@ -93,7 +92,7 @@ writeByteStringOutput :: ()
   -> m (Either (FileError e) ())
 writeByteStringOutput mOutput bs = runExceptT $
   case mOutput of
-    Just fp -> handleIOExceptT (FileIOError (unFile fp)) $ BS.writeFile (unFile fp) bs
+    Just fp -> fileIOExceptT (unFile fp) (`BS.writeFile` bs)
     Nothing -> liftIO $ BSC.putStr bs
 
 writeLazyByteStringFile :: ()
@@ -102,7 +101,7 @@ writeLazyByteStringFile :: ()
   -> LBS.ByteString
   -> m (Either (FileError e) ())
 writeLazyByteStringFile fp bs = runExceptT $
-  handleIOExceptT (FileIOError (unFile fp)) $ LBS.writeFile (unFile fp) bs
+  fileIOExceptT (unFile fp) (`LBS.writeFile` bs)
 
 writeLazyByteStringFileWithOwnerPermissions
   :: File content Out
@@ -119,7 +118,7 @@ writeLazyByteStringOutput :: ()
   -> m (Either (FileError e) ())
 writeLazyByteStringOutput mOutput bs = runExceptT $
   case mOutput of
-    Just fp -> handleIOExceptT (FileIOError (unFile fp)) $ LBS.writeFile (unFile fp) bs
+    Just fp -> fileIOExceptT (unFile fp) (`LBS.writeFile` bs)
     Nothing -> liftIO $ LBSC.putStr bs
 
 writeTextFile :: ()
@@ -128,7 +127,7 @@ writeTextFile :: ()
   -> Text
   -> m (Either (FileError e) ())
 writeTextFile fp t = runExceptT $
-  handleIOExceptT (FileIOError (unFile fp)) $ Text.writeFile (unFile fp) t
+  fileIOExceptT (unFile fp) (`Text.writeFile` t)
 
 writeTextFileWithOwnerPermissions
   :: File content Out
@@ -145,7 +144,7 @@ writeTextOutput :: ()
   -> m (Either (FileError e) ())
 writeTextOutput mOutput t = runExceptT $
   case mOutput of
-    Just fp -> handleIOExceptT (FileIOError (unFile fp)) $ Text.writeFile (unFile fp) t
+    Just fp -> fileIOExceptT (unFile fp) (`Text.writeFile` t)
     Nothing -> liftIO $ Text.putStr t
 
 mapFile :: (FilePath -> FilePath) -> File content direction -> File content direction

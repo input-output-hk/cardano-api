@@ -46,7 +46,7 @@ import           Cardano.Binary (DecoderError)
 
 import           Control.Monad (unless)
 import           Control.Monad.Trans.Except (ExceptT (..), runExceptT)
-import           Control.Monad.Trans.Except.Extra (firstExceptT, handleIOExceptT, hoistEither)
+import           Control.Monad.Trans.Except.Extra (firstExceptT, hoistEither)
 import           Data.Aeson (FromJSON (..), ToJSON (..), object, withObject, (.:), (.=))
 import qualified Data.Aeson as Aeson
 import           Data.Aeson.Encode.Pretty (Config (..), defConfig, encodePretty', keyOrder)
@@ -234,7 +234,7 @@ readFileTextEnvelope :: HasTextEnvelope a
                      -> IO (Either (FileError TextEnvelopeError) a)
 readFileTextEnvelope ttoken path =
     runExceptT $ do
-      content <- handleIOExceptT (FileIOError (unFile path)) $ readFileBlocking (unFile path)
+      content <- fileIOExceptT (unFile path) readFileBlocking
       firstExceptT (FileError (unFile path)) $ hoistEither $ do
         te <- first TextEnvelopeAesonDecodeError $ Aeson.eitherDecodeStrict' content
         deserialiseFromTextEnvelope ttoken te
@@ -245,7 +245,7 @@ readFileTextEnvelopeAnyOf :: [FromSomeType HasTextEnvelope b]
                           -> IO (Either (FileError TextEnvelopeError) b)
 readFileTextEnvelopeAnyOf types path =
     runExceptT $ do
-      content <- handleIOExceptT (FileIOError (unFile path)) $ readFileBlocking (unFile path)
+      content <- fileIOExceptT (unFile path) readFileBlocking
       firstExceptT (FileError (unFile path)) $ hoistEither $ do
         te <- first TextEnvelopeAesonDecodeError $ Aeson.eitherDecodeStrict' content
         deserialiseFromTextEnvelopeAnyOf types te
@@ -255,8 +255,7 @@ readTextEnvelopeFromFile :: FilePath
                          -> IO (Either (FileError TextEnvelopeError) TextEnvelope)
 readTextEnvelopeFromFile path =
   runExceptT $ do
-    bs <- handleIOExceptT (FileIOError path) $
-            readFileBlocking path
+    bs <- fileIOExceptT path readFileBlocking
     firstExceptT (FileError path . TextEnvelopeAesonDecodeError)
       . hoistEither $ Aeson.eitherDecodeStrict' bs
 

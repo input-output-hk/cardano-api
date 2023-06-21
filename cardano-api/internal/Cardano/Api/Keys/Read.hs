@@ -18,10 +18,9 @@ import           Cardano.Api.SerialiseBech32
 import           Cardano.Api.SerialiseTextEnvelope
 import           Cardano.Api.Utils
 
-import           Control.Exception
 import           Data.Bifunctor
-import           Data.ByteString as BS
 import           Data.List.NonEmpty (NonEmpty)
+import Control.Monad.Except (runExceptT)
 
 -- | Read a cryptographic key from a file.
 --
@@ -33,14 +32,11 @@ readKeyFile
   -> FilePath
   -> IO (Either (FileError InputDecodeError) a)
 readKeyFile asType acceptedFormats path = do
-  eContent <- fmap Right (readFileBlocking path) `catches` [Handler handler]
+  eContent <- runExceptT $ fileIOExceptT path readFileBlocking
   case eContent of
     Left e -> return $ Left e
     Right content ->
       return . first (FileError path) $ deserialiseInput asType acceptedFormats content
- where
-  handler :: IOException -> IO (Either (FileError InputDecodeError) BS.ByteString)
-  handler e = return . Left $ FileIOError path e
 
 -- | Read a cryptographic key from a file.
 --
@@ -65,12 +61,8 @@ readKeyFileAnyOf
   -> File content In
   -> IO (Either (FileError InputDecodeError) b)
 readKeyFileAnyOf bech32Types textEnvTypes path = do
-  eContent <- fmap Right (readFileBlocking (unFile path)) `catches` [Handler handler]
+  eContent <- runExceptT $ fileIOExceptT (unFile path) readFileBlocking
   case eContent of
     Left e -> return $ Left e
     Right content ->
       return . first (FileError (unFile path)) $ deserialiseInputAnyOf bech32Types textEnvTypes content
- where
-  handler :: IOException -> IO (Either (FileError InputDecodeError) BS.ByteString)
-  handler e = return . Left $ FileIOError (unFile path) e
-

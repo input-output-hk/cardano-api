@@ -17,14 +17,14 @@ module Cardano.Api.IO.Compat.Posix
 
 #ifdef UNIX
 
-import           Cardano.Api.Error (FileError (..))
+import           Cardano.Api.Error (FileError (..), fileIOExceptT)
 import           Cardano.Api.IO.Base
 
 import           Control.Exception (IOException, bracket, bracketOnError, try)
 import           Control.Monad (forM_, when)
 import           Control.Monad.Except (ExceptT, runExceptT)
 import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Except.Extra (handleIOExceptT, left)
+import           Control.Monad.Trans.Except.Extra (left)
 import qualified Data.ByteString as BS
 import           System.Directory ()
 import           System.FilePath ((</>))
@@ -62,7 +62,7 @@ handleFileForWritingWithOwnerPermissionImpl path f = do
       bracket
         (fdToHandle fd)
         IO.hClose
-        (runExceptT . handleIOExceptT (FileIOError path) . f)
+        (runExceptT . fileIOExceptT path . const . f)
 
 writeSecretsImpl :: FilePath -> [Char] -> [Char] -> (a -> BS.ByteString) -> [a] -> IO ()
 writeSecretsImpl outDir prefix suffix secretOp xs =
