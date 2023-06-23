@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Test.Cardano.Api.Typed.TxBody
   ( tests
@@ -14,8 +15,9 @@ import           Test.Gen.Cardano.Api.Typed (genTxBodyContent)
 
 import           Test.Cardano.Api.Typed.Orphans ()
 
-import           Hedgehog (MonadTest, Property, annotateShow, failure, (===))
+import           Hedgehog (MonadTest, Property, annotateShow, failure, forAll, (===))
 import qualified Hedgehog as H
+import qualified Hedgehog.Gen as Gen
 import           Test.Tasty (TestTree, testGroup)
 import           Test.Tasty.Hedgehog (testProperty)
 
@@ -74,7 +76,23 @@ prop_roundtrip_txbodycontent_txouts =
     (ReferenceScript _ (ScriptInAnyLang actual _)) -> isJust $ testEquality expected actual
     _ -> False
 
+prop_disjoint_OnlyAdaFeature_MultiAssetFeature :: Property
+prop_disjoint_OnlyAdaFeature_MultiAssetFeature =
+  H.property $ do
+    AnyCardanoEra era <- forAll $ Gen.element [minBound..maxBound]
+    let hasOnlyAdaFeature = featureInEra @OnlyAdaFeature False (const True) era
+    let hasMultiAssetFeature = featureInEra @MultiAssetFeature False (const True) era
+    hasOnlyAdaFeature === not hasMultiAssetFeature
+
+prop_total_onlyAdaOrMultiAssetFeatureInEra :: Property
+prop_total_onlyAdaOrMultiAssetFeatureInEra =
+  H.property $ do
+    AnyCardanoEra era <- forAll $ Gen.element [minBound..maxBound]
+    either id id (onlyAdaOrMultiAssetFeatureInEra (const ()) (const ()) era) === ()
+
 tests :: TestTree
 tests = testGroup "Test.Cardano.Api.Typed.TxBody"
   [ testProperty "roundtrip txbodycontent txouts" prop_roundtrip_txbodycontent_txouts
+  , testProperty "disjoint OnlyAdaFeature MultiAssetFeature" prop_disjoint_OnlyAdaFeature_MultiAssetFeature
+  , testProperty "total onlyAdaOrMultiAssetFeatureInEra" prop_total_onlyAdaOrMultiAssetFeatureInEra
   ]

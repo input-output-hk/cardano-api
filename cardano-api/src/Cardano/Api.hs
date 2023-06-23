@@ -255,7 +255,6 @@ module Cardano.Api (
     TxExtraKeyWitnesses(..),
     TxWithdrawals(..),
     TxCertificates(..),
-    TxUpdateProposal(..),
     TxMintValue(..),
 
     -- ** Building vs viewing transactions
@@ -265,8 +264,8 @@ module Cardano.Api (
 
     -- ** Era-dependent transaction body features
     CollateralSupportedInEra(..),
-    MultiAssetSupportedInEra(..),
-    OnlyAdaSupportedInEra(..),
+    MultiAssetFeature(..),
+    OnlyAdaFeature(..),
     TxFeesExplicitInEra(..),
     TxFeesImplicitInEra(..),
     ValidityUpperBoundSupportedInEra(..),
@@ -278,12 +277,13 @@ module Cardano.Api (
     ScriptDataSupportedInEra(..),
     WithdrawalsSupportedInEra(..),
     CertificatesSupportedInEra(..),
-    UpdateProposalSupportedInEra(..),
+    UpdateProposalFeature(..),
     TxTotalAndReturnCollateralSupportedInEra(..),
     FeatureInEra(..),
 
     -- ** Feature availability functions
     collateralSupportedInEra,
+    onlyAdaOrMultiAssetFeatureInEra,
     multiAssetSupportedInEra,
     txFeesExplicitInEra,
     validityUpperBoundSupportedInEra,
@@ -294,7 +294,6 @@ module Cardano.Api (
     extraKeyWitnessesSupportedInEra,
     withdrawalsSupportedInEra,
     certificatesSupportedInEra,
-    updateProposalSupportedInEra,
     scriptDataSupportedInEra,
     totalAndReturnCollateralSupportedInEra,
 
@@ -325,13 +324,9 @@ module Cardano.Api (
     makeTransactionBodyAutoBalance,
     BalancedTxBody(..),
     TxBodyErrorAutoBalance(..),
-    TxScriptValidity(..),
     ScriptValidity(..),
-    TxScriptValiditySupportedInEra(..),
-    scriptValidityToTxScriptValidity,
-    txScriptValiditySupportedInShelleyBasedEra,
-    txScriptValiditySupportedInCardanoEra,
-    txScriptValidityToScriptValidity,
+    TxScriptValidityFeature(..),
+    defaultScriptValidity,
 
     -- * Signing transactions
     -- | Creating transaction witnesses one by one, or all in one go.

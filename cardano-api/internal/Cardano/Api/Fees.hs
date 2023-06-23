@@ -44,6 +44,7 @@ import           Cardano.Api.Address
 import           Cardano.Api.Certificate
 import           Cardano.Api.Eras
 import           Cardano.Api.Error
+import           Cardano.Api.Feature
 import           Cardano.Api.NetworkId
 import           Cardano.Api.ProtocolParameters
 import           Cardano.Api.Query
@@ -303,9 +304,9 @@ estimateTransactionKeyWitnessCount TxBodyContent {
       _ -> 0
 
   + case txUpdateProposal of
-      TxUpdateProposal _ (UpdateProposal updatePerGenesisKey _)
+      FeatureValue _ (UpdateProposal updatePerGenesisKey _)
         -> Map.size updatePerGenesisKey
-      _ -> 0
+      NoFeatureValue -> 0
 
 
 -- ----------------------------------------------------------------------------
@@ -674,7 +675,7 @@ evaluateTransactionBalance bpp poolids stakeDelegDeposits utxo
                    => ShelleyEraTxBody ledgerera
                    => LedgerEraConstraints ledgerera
                    => LedgerMultiAssetConstraints ledgerera
-                   => MultiAssetSupportedInEra era
+                   => MultiAssetFeature era
                    -> TxOutValue era
     evalMultiAsset evidence =
       TxOutValue evidence . fromMaryValue $
@@ -690,7 +691,7 @@ evaluateTransactionBalance bpp poolids stakeDelegDeposits utxo
                 => ShelleyEraTxBody ledgerera
                 => LedgerEraConstraints ledgerera
                 => LedgerAdaOnlyConstraints ledgerera
-                => OnlyAdaSupportedInEra era
+                => OnlyAdaFeature era
                 -> TxOutValue era
     evalAdaOnly evidence =
      TxOutAdaOnly evidence . fromShelleyLovelace
@@ -709,13 +710,13 @@ evaluateTransactionBalance bpp poolids stakeDelegDeposits utxo
           => LedgerAdaOnlyConstraints ledgerera
           => LedgerPParamsConstraints ledgerera
           => LedgerTxBodyConstraints ledgerera
-          => OnlyAdaSupportedInEra era
+          => OnlyAdaFeature era
           -> a)
       -> (   LedgerEraConstraints ledgerera
           => LedgerMultiAssetConstraints ledgerera
           => LedgerPParamsConstraints ledgerera
           => LedgerTxBodyConstraints ledgerera
-          => MultiAssetSupportedInEra era
+          => MultiAssetFeature era
           -> a)
       -> a
     withLedgerConstraints ShelleyBasedEraShelley f _ = f AdaOnlyInShelleyEra
@@ -939,7 +940,7 @@ makeTransactionBodyAutoBalance systemstart history pparams poolids stakeDelegDep
       case Map.mapEither id exUnitsMap of
         (failures, exUnitsMap') ->
           handleExUnitsErrors
-            (txScriptValidityToScriptValidity (txScriptValidity txbodycontent))
+            (valueOrDefault defaultScriptValidity (txScriptValidity txbodycontent))
             failures
             exUnitsMap'
 

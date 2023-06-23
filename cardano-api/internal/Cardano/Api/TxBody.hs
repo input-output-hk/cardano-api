@@ -57,15 +57,14 @@ module Cardano.Api.TxBody (
     setTxScriptValidity,
     TxBodyError(..),
     TxBodyScriptData(..),
-    TxScriptValidity(..),
-    TxScriptValiditySupportedInEra(..),
 
     ScriptValidity(..),
+    defaultScriptValidity,
+
+    TxScriptValidityFeature(..),
+
     scriptValidityToIsValid,
     isValidToScriptValidity,
-    scriptValidityToTxScriptValidity,
-    txScriptValidityToIsValid,
-    txScriptValidityToScriptValidity,
 
     -- * Transaction Ids
     TxId(..),
@@ -105,7 +104,6 @@ module Cardano.Api.TxBody (
     TxExtraKeyWitnesses(..),
     TxWithdrawals(..),
     TxCertificates(..),
-    TxUpdateProposal(..),
     TxMintValue(..),
 
     -- ** Building vs viewing transactions
@@ -115,8 +113,8 @@ module Cardano.Api.TxBody (
 
     -- * Era-dependent transaction body features
     CollateralSupportedInEra(..),
-    MultiAssetSupportedInEra(..),
-    OnlyAdaSupportedInEra(..),
+    MultiAssetFeature(..),
+    OnlyAdaFeature(..),
     TxFeesExplicitInEra(..),
     TxFeesImplicitInEra(..),
     ValidityUpperBoundSupportedInEra(..),
@@ -128,12 +126,13 @@ module Cardano.Api.TxBody (
     ScriptDataSupportedInEra(..),
     WithdrawalsSupportedInEra(..),
     CertificatesSupportedInEra(..),
-    UpdateProposalSupportedInEra(..),
+    UpdateProposalFeature(..),
     TxTotalAndReturnCollateralSupportedInEra(..),
 
     -- ** Feature availability functions
     collateralSupportedInEra,
     multiAssetSupportedInEra,
+    onlyAdaOrMultiAssetFeatureInEra,
     txFeesExplicitInEra,
     validityUpperBoundSupportedInEra,
     validityNoUpperBoundSupportedInEra,
@@ -144,9 +143,6 @@ module Cardano.Api.TxBody (
     scriptDataSupportedInEra,
     withdrawalsSupportedInEra,
     certificatesSupportedInEra,
-    updateProposalSupportedInEra,
-    txScriptValiditySupportedInShelleyBasedEra,
-    txScriptValiditySupportedInCardanoEra,
     totalAndReturnCollateralSupportedInEra,
 
     -- * Inspecting 'ScriptWitness'es
@@ -188,6 +184,7 @@ import           Cardano.Api.Convenience.Constraints
 import           Cardano.Api.EraCast
 import           Cardano.Api.Eras
 import           Cardano.Api.Error
+import           Cardano.Api.Feature
 import           Cardano.Api.Hash
 import           Cardano.Api.HasTypeProxy
 import           Cardano.Api.Keys.Byron
@@ -300,58 +297,26 @@ isValidToScriptValidity :: L.IsValid -> ScriptValidity
 isValidToScriptValidity (L.IsValid False) = ScriptInvalid
 isValidToScriptValidity (L.IsValid True) = ScriptValid
 
--- | A representation of whether the era supports tx script validity.
---
--- The Alonzo and subsequent eras support script validity.
---
-data TxScriptValidity era where
-  TxScriptValidityNone :: TxScriptValidity era
+data TxScriptValidityFeature era where
+  TxScriptValiditySupportedInAlonzoEra  :: TxScriptValidityFeature AlonzoEra
+  TxScriptValiditySupportedInBabbageEra :: TxScriptValidityFeature BabbageEra
+  TxScriptValiditySupportedInConwayEra  :: TxScriptValidityFeature ConwayEra
 
-  -- | Tx script validity is supported in transactions in the 'Alonzo' era onwards.
-  TxScriptValidity
-    :: TxScriptValiditySupportedInEra era
-    -> ScriptValidity
-    -> TxScriptValidity era
+deriving instance Eq (TxScriptValidityFeature era)
+deriving instance Show (TxScriptValidityFeature era)
 
-deriving instance Eq   (TxScriptValiditySupportedInEra era)
-deriving instance Show (TxScriptValiditySupportedInEra era)
+instance FeatureInEra TxScriptValidityFeature where
+  featureInEra no yes = \case
+    ByronEra    -> no
+    ShelleyEra  -> no
+    AllegraEra  -> no
+    MaryEra     -> no
+    AlonzoEra   -> yes TxScriptValiditySupportedInAlonzoEra
+    BabbageEra  -> yes TxScriptValiditySupportedInBabbageEra
+    ConwayEra   -> yes TxScriptValiditySupportedInConwayEra
 
-data TxScriptValiditySupportedInEra era where
-  TxScriptValiditySupportedInAlonzoEra  :: TxScriptValiditySupportedInEra AlonzoEra
-  TxScriptValiditySupportedInBabbageEra :: TxScriptValiditySupportedInEra BabbageEra
-  TxScriptValiditySupportedInConwayEra  :: TxScriptValiditySupportedInEra ConwayEra
-
-deriving instance Eq   (TxScriptValidity era)
-deriving instance Show (TxScriptValidity era)
-
-txScriptValiditySupportedInCardanoEra :: CardanoEra era -> Maybe (TxScriptValiditySupportedInEra era)
-txScriptValiditySupportedInCardanoEra ByronEra   = Nothing
-txScriptValiditySupportedInCardanoEra ShelleyEra = Nothing
-txScriptValiditySupportedInCardanoEra AllegraEra = Nothing
-txScriptValiditySupportedInCardanoEra MaryEra    = Nothing
-txScriptValiditySupportedInCardanoEra AlonzoEra  = Just TxScriptValiditySupportedInAlonzoEra
-txScriptValiditySupportedInCardanoEra BabbageEra = Just TxScriptValiditySupportedInBabbageEra
-txScriptValiditySupportedInCardanoEra ConwayEra = Just TxScriptValiditySupportedInConwayEra
-
-txScriptValiditySupportedInShelleyBasedEra :: ShelleyBasedEra era -> Maybe (TxScriptValiditySupportedInEra era)
-txScriptValiditySupportedInShelleyBasedEra ShelleyBasedEraShelley = Nothing
-txScriptValiditySupportedInShelleyBasedEra ShelleyBasedEraAllegra = Nothing
-txScriptValiditySupportedInShelleyBasedEra ShelleyBasedEraMary    = Nothing
-txScriptValiditySupportedInShelleyBasedEra ShelleyBasedEraAlonzo  = Just TxScriptValiditySupportedInAlonzoEra
-txScriptValiditySupportedInShelleyBasedEra ShelleyBasedEraBabbage = Just TxScriptValiditySupportedInBabbageEra
-txScriptValiditySupportedInShelleyBasedEra ShelleyBasedEraConway = Just TxScriptValiditySupportedInConwayEra
-
-txScriptValidityToScriptValidity :: TxScriptValidity era -> ScriptValidity
-txScriptValidityToScriptValidity TxScriptValidityNone = ScriptValid
-txScriptValidityToScriptValidity (TxScriptValidity _ scriptValidity) = scriptValidity
-
-scriptValidityToTxScriptValidity :: ShelleyBasedEra era -> ScriptValidity -> TxScriptValidity era
-scriptValidityToTxScriptValidity era scriptValidity = case txScriptValiditySupportedInShelleyBasedEra era of
-  Nothing -> TxScriptValidityNone
-  Just witness -> TxScriptValidity witness scriptValidity
-
-txScriptValidityToIsValid :: TxScriptValidity era -> L.IsValid
-txScriptValidityToIsValid = scriptValidityToIsValid . txScriptValidityToScriptValidity
+defaultScriptValidity :: ScriptValidity
+defaultScriptValidity = ScriptValid
 
 -- ----------------------------------------------------------------------------
 -- Transaction outputs
@@ -930,56 +895,83 @@ collateralSupportedInEra ConwayEra = Just CollateralInConwayEra
 --
 -- The Mary and subsequent eras support multi-asset transactions.
 --
--- The negation of this is 'OnlyAdaSupportedInEra'.
+-- The negation of this is 'OnlyAdaFeature'.
 --
-data MultiAssetSupportedInEra era where
+data MultiAssetFeature era where
 
      -- | Multi-asset transactions are supported in the 'Mary' era.
-     MultiAssetInMaryEra :: MultiAssetSupportedInEra MaryEra
+     MultiAssetInMaryEra :: MultiAssetFeature MaryEra
 
      -- | Multi-asset transactions are supported in the 'Alonzo' era.
-     MultiAssetInAlonzoEra :: MultiAssetSupportedInEra AlonzoEra
+     MultiAssetInAlonzoEra :: MultiAssetFeature AlonzoEra
 
      -- | Multi-asset transactions are supported in the 'Babbage' era.
-     MultiAssetInBabbageEra :: MultiAssetSupportedInEra BabbageEra
+     MultiAssetInBabbageEra :: MultiAssetFeature BabbageEra
 
      -- | Multi-asset transactions are supported in the 'Conway' era.
-     MultiAssetInConwayEra :: MultiAssetSupportedInEra ConwayEra
+     MultiAssetInConwayEra :: MultiAssetFeature ConwayEra
 
-deriving instance Eq   (MultiAssetSupportedInEra era)
-deriving instance Show (MultiAssetSupportedInEra era)
+deriving instance Eq   (MultiAssetFeature era)
+deriving instance Show (MultiAssetFeature era)
 
-instance ToJSON (MultiAssetSupportedInEra era) where
+instance ToJSON (MultiAssetFeature era) where
   toJSON = Aeson.String . Text.pack . show
+
+instance FeatureInEra MultiAssetFeature where
+  featureInEra no yes = \case
+    ByronEra    -> no
+    ShelleyEra  -> no
+    AllegraEra  -> no
+    MaryEra     -> yes MultiAssetInMaryEra
+    AlonzoEra   -> yes MultiAssetInAlonzoEra
+    BabbageEra  -> yes MultiAssetInBabbageEra
+    ConwayEra   -> yes MultiAssetInConwayEra
 
 -- | A representation of whether the era supports only ada transactions.
 --
 -- Prior to the Mary era only ada transactions are supported. Multi-assets are
 -- supported from the Mary era onwards.
 --
--- This is the negation of 'MultiAssetSupportedInEra'. It exists since we need
+-- This is the negation of 'MultiAssetFeature'. It exists since we need
 -- evidence to be positive.
 --
-data OnlyAdaSupportedInEra era where
+data OnlyAdaFeature era where
 
-     AdaOnlyInByronEra   :: OnlyAdaSupportedInEra ByronEra
-     AdaOnlyInShelleyEra :: OnlyAdaSupportedInEra ShelleyEra
-     AdaOnlyInAllegraEra :: OnlyAdaSupportedInEra AllegraEra
+     AdaOnlyInByronEra   :: OnlyAdaFeature ByronEra
+     AdaOnlyInShelleyEra :: OnlyAdaFeature ShelleyEra
+     AdaOnlyInAllegraEra :: OnlyAdaFeature AllegraEra
 
-deriving instance Eq   (OnlyAdaSupportedInEra era)
-deriving instance Show (OnlyAdaSupportedInEra era)
+deriving instance Eq   (OnlyAdaFeature era)
+deriving instance Show (OnlyAdaFeature era)
+
+instance FeatureInEra OnlyAdaFeature where
+  featureInEra no yes = \case
+    ByronEra    -> yes AdaOnlyInByronEra
+    ShelleyEra  -> yes AdaOnlyInShelleyEra
+    AllegraEra  -> yes AdaOnlyInAllegraEra
+    MaryEra     -> no
+    AlonzoEra   -> no
+    BabbageEra  -> no
+    ConwayEra   -> no
+
+onlyAdaOrMultiAssetFeatureInEra :: ()
+  => (OnlyAdaFeature era -> a)    -- ^ Value to use if the feature is not supported in the era
+  -> (MultiAssetFeature era -> b) -- ^ Function to get thealue to use if the feature is supported in the era
+  -> CardanoEra era               -- ^ Era to check
+  -> Either a b
+onlyAdaOrMultiAssetFeatureInEra onlyAda multiAsset era =
+  featureInEra
+    (featureInEra
+      (error "IMPOSSIBLE: This is checked by prop_total_onlyAdaOrMultiAssetFeatureInEra")
+      (Left . onlyAda)
+      era)
+    (Right . multiAsset)
+    era
 
 multiAssetSupportedInEra :: CardanoEra era
-                         -> Either (OnlyAdaSupportedInEra era)
-                                   (MultiAssetSupportedInEra era)
-multiAssetSupportedInEra ByronEra   = Left AdaOnlyInByronEra
-multiAssetSupportedInEra ShelleyEra = Left AdaOnlyInShelleyEra
-multiAssetSupportedInEra AllegraEra = Left AdaOnlyInAllegraEra
-multiAssetSupportedInEra MaryEra    = Right MultiAssetInMaryEra
-multiAssetSupportedInEra AlonzoEra  = Right MultiAssetInAlonzoEra
-multiAssetSupportedInEra BabbageEra = Right MultiAssetInBabbageEra
-multiAssetSupportedInEra ConwayEra = Right MultiAssetInConwayEra
-
+                         -> Either (OnlyAdaFeature era)
+                                   (MultiAssetFeature era)
+multiAssetSupportedInEra = onlyAdaOrMultiAssetFeatureInEra id id
 
 -- | A representation of whether the era requires explicitly specified fees in
 -- transactions.
@@ -1281,27 +1273,26 @@ certificatesSupportedInEra ConwayEra  = Just CertificatesInConwayEra
 -- era has a notion of an update proposal, but it is a standalone chain object
 -- and not embedded in a transaction.
 --
-data UpdateProposalSupportedInEra era where
+data UpdateProposalFeature era where
+  UpdateProposalInShelleyEra :: UpdateProposalFeature ShelleyEra
+  UpdateProposalInAllegraEra :: UpdateProposalFeature AllegraEra
+  UpdateProposalInMaryEra    :: UpdateProposalFeature MaryEra
+  UpdateProposalInAlonzoEra  :: UpdateProposalFeature AlonzoEra
+  UpdateProposalInBabbageEra :: UpdateProposalFeature BabbageEra
+  UpdateProposalInConwayEra  :: UpdateProposalFeature ConwayEra
 
-     UpdateProposalInShelleyEra :: UpdateProposalSupportedInEra ShelleyEra
-     UpdateProposalInAllegraEra :: UpdateProposalSupportedInEra AllegraEra
-     UpdateProposalInMaryEra    :: UpdateProposalSupportedInEra MaryEra
-     UpdateProposalInAlonzoEra  :: UpdateProposalSupportedInEra AlonzoEra
-     UpdateProposalInBabbageEra :: UpdateProposalSupportedInEra BabbageEra
-     UpdateProposalInConwayEra  :: UpdateProposalSupportedInEra ConwayEra
+deriving instance Eq   (UpdateProposalFeature era)
+deriving instance Show (UpdateProposalFeature era)
 
-deriving instance Eq   (UpdateProposalSupportedInEra era)
-deriving instance Show (UpdateProposalSupportedInEra era)
-
-updateProposalSupportedInEra :: CardanoEra era
-                             -> Maybe (UpdateProposalSupportedInEra era)
-updateProposalSupportedInEra ByronEra   = Nothing
-updateProposalSupportedInEra ShelleyEra = Just UpdateProposalInShelleyEra
-updateProposalSupportedInEra AllegraEra = Just UpdateProposalInAllegraEra
-updateProposalSupportedInEra MaryEra    = Just UpdateProposalInMaryEra
-updateProposalSupportedInEra AlonzoEra  = Just UpdateProposalInAlonzoEra
-updateProposalSupportedInEra BabbageEra = Just UpdateProposalInBabbageEra
-updateProposalSupportedInEra ConwayEra  = Just UpdateProposalInConwayEra
+instance FeatureInEra UpdateProposalFeature where
+  featureInEra no yes = \case
+    ByronEra   -> no
+    ShelleyEra -> yes UpdateProposalInShelleyEra
+    AllegraEra -> yes UpdateProposalInAllegraEra
+    MaryEra    -> yes UpdateProposalInMaryEra
+    AlonzoEra  -> yes UpdateProposalInAlonzoEra
+    BabbageEra -> yes UpdateProposalInBabbageEra
+    ConwayEra  -> yes UpdateProposalInConwayEra
 
 -- ----------------------------------------------------------------------------
 -- Building vs viewing transactions
@@ -1356,9 +1347,9 @@ deriving instance Show (TxInsReference build era)
 
 data TxOutValue era where
 
-     TxOutAdaOnly :: OnlyAdaSupportedInEra era -> Lovelace -> TxOutValue era
+     TxOutAdaOnly :: OnlyAdaFeature era -> Lovelace -> TxOutValue era
 
-     TxOutValue   :: MultiAssetSupportedInEra era -> Value -> TxOutValue era
+     TxOutValue   :: MultiAssetFeature era -> Value -> TxOutValue era
 
 instance EraCast TxOutValue where
   eraCast toEra v = case v of
@@ -1366,7 +1357,7 @@ instance EraCast TxOutValue where
       case multiAssetSupportedInEra toEra of
         Left adaOnly -> Right $ TxOutAdaOnly adaOnly lovelace
         Right multiAssetSupp -> Right $ TxOutValue multiAssetSupp $ lovelaceToValue lovelace
-    TxOutValue  (_ :: MultiAssetSupportedInEra fromEra) value  ->
+    TxOutValue  (_ :: MultiAssetFeature fromEra) value  ->
       case multiAssetSupportedInEra toEra of
         Left _adaOnly -> Left $ EraCastError v (cardanoEra @fromEra) toEra
         Right multiAssetSupp -> Right $ TxOutValue multiAssetSupp value
@@ -1697,21 +1688,6 @@ deriving instance Eq   (TxCertificates build era)
 deriving instance Show (TxCertificates build era)
 
 -- ----------------------------------------------------------------------------
--- Transaction update proposal (era-dependent)
---
-
-data TxUpdateProposal era where
-
-     TxUpdateProposalNone :: TxUpdateProposal era
-
-     TxUpdateProposal     :: UpdateProposalSupportedInEra era
-                          -> UpdateProposal
-                          -> TxUpdateProposal era
-
-deriving instance Eq   (TxUpdateProposal era)
-deriving instance Show (TxUpdateProposal era)
-
--- ----------------------------------------------------------------------------
 -- Value minting within transactions (era-dependent)
 --
 
@@ -1719,7 +1695,7 @@ data TxMintValue build era where
 
      TxMintNone  :: TxMintValue build era
 
-     TxMintValue :: MultiAssetSupportedInEra era
+     TxMintValue :: MultiAssetFeature era
                  -> Value
                  -> BuildTxWith build
                       (Map PolicyId (ScriptWitness WitCtxMint era))
@@ -1749,9 +1725,9 @@ data TxBodyContent build era =
        txProtocolParams   :: BuildTxWith build (Maybe ProtocolParameters),
        txWithdrawals      :: TxWithdrawals  build era,
        txCertificates     :: TxCertificates build era,
-       txUpdateProposal   :: TxUpdateProposal era,
+       txUpdateProposal   :: FeatureValue UpdateProposalFeature era UpdateProposal,
        txMintValue        :: TxMintValue    build era,
-       txScriptValidity   :: TxScriptValidity era
+       txScriptValidity   :: FeatureValue TxScriptValidityFeature era ScriptValidity
      }
      deriving (Eq, Show)
 
@@ -1771,9 +1747,9 @@ defaultTxBodyContent = TxBodyContent
     , txProtocolParams = BuildTxWith Nothing
     , txWithdrawals = TxWithdrawalsNone
     , txCertificates = TxCertificatesNone
-    , txUpdateProposal = TxUpdateProposalNone
+    , txUpdateProposal = NoFeatureValue
     , txMintValue = TxMintNone
-    , txScriptValidity = TxScriptValidityNone
+    , txScriptValidity = NoFeatureValue
     }
 
 setTxIns :: TxIns build era -> TxBodyContent build era -> TxBodyContent build era
@@ -1830,13 +1806,13 @@ setTxWithdrawals v txBodyContent = txBodyContent { txWithdrawals = v }
 setTxCertificates :: TxCertificates build era -> TxBodyContent build era -> TxBodyContent build era
 setTxCertificates v txBodyContent = txBodyContent { txCertificates = v }
 
-setTxUpdateProposal :: TxUpdateProposal era -> TxBodyContent build era -> TxBodyContent build era
+setTxUpdateProposal :: FeatureValue UpdateProposalFeature era UpdateProposal -> TxBodyContent build era -> TxBodyContent build era
 setTxUpdateProposal v txBodyContent = txBodyContent { txUpdateProposal = v }
 
 setTxMintValue :: TxMintValue build era -> TxBodyContent build era -> TxBodyContent build era
 setTxMintValue v txBodyContent = txBodyContent { txMintValue = v }
 
-setTxScriptValidity :: TxScriptValidity era -> TxBodyContent build era -> TxBodyContent build era
+setTxScriptValidity :: FeatureValue TxScriptValidityFeature era ScriptValidity -> TxBodyContent build era -> TxBodyContent build era
 setTxScriptValidity v txBodyContent = txBodyContent { txScriptValidity = v }
 
 -- ----------------------------------------------------------------------------
@@ -1872,7 +1848,7 @@ data TxBody era where
           -- auxiliary data.
        -> Maybe (L.TxAuxData (ShelleyLedgerEra era))
 
-       -> TxScriptValidity era -- ^ Mark script as expected to pass or fail validation
+       -> FeatureValue TxScriptValidityFeature era ScriptValidity -- ^ Mark script as expected to pass or fail validation
 
        -> TxBody era
      -- The 'ShelleyBasedEra' GADT tells us what era we are in.
@@ -2104,7 +2080,7 @@ serialiseShelleyBasedTxBody
   -> [Ledger.Script ledgerera]
   -> TxBodyScriptData era
   -> Maybe (L.TxAuxData ledgerera)
-  -> TxScriptValidity era -- ^ Mark script as expected to pass or fail validation
+  -> FeatureValue TxScriptValidityFeature era ScriptValidity -- ^ Mark script as expected to pass or fail validation
   -> ByteString
 serialiseShelleyBasedTxBody era txbody txscripts
                             TxBodyNoScriptData txmetadata scriptValidity =
@@ -2118,21 +2094,21 @@ serialiseShelleyBasedTxBody era txbody txscripts
           $ CBOR.encodeListLen 4
          <> CBOR.encCBOR txbody
          <> CBOR.encCBOR txscripts
-         <> CBOR.encCBOR (txScriptValidityToScriptValidity scriptValidity)
+         <> CBOR.encCBOR (valueOrDefault defaultScriptValidity scriptValidity)
          <> CBOR.encodeNullMaybe CBOR.encCBOR txmetadata
       ShelleyBasedEraBabbage ->
         CBOR.serialize' (L.eraProtVerLow @L.Babbage)
           $ CBOR.encodeListLen 4
          <> CBOR.encCBOR txbody
          <> CBOR.encCBOR txscripts
-         <> CBOR.encCBOR (txScriptValidityToScriptValidity scriptValidity)
+         <> CBOR.encCBOR (valueOrDefault defaultScriptValidity scriptValidity)
          <> CBOR.encodeNullMaybe CBOR.encCBOR txmetadata
       ShelleyBasedEraConway ->
         CBOR.serialize' (L.eraProtVerLow @L.Babbage)
           $ CBOR.encodeListLen 4
          <> CBOR.encCBOR txbody
          <> CBOR.encCBOR txscripts
-         <> CBOR.encCBOR (txScriptValidityToScriptValidity scriptValidity)
+         <> CBOR.encCBOR (valueOrDefault defaultScriptValidity scriptValidity)
          <> CBOR.encodeNullMaybe CBOR.encCBOR txmetadata
  where
    preAlonzo v = CBOR.serialize' v
@@ -2150,7 +2126,7 @@ serialiseShelleyBasedTxBody _era txbody txscripts
      <> CBOR.encCBOR txscripts
      <> CBOR.encCBOR datums
      <> CBOR.encCBOR redeemers
-     <> CBOR.encCBOR (txScriptValidityToScriptValidity txBodyScriptValidity)
+     <> CBOR.encCBOR (valueOrDefault defaultScriptValidity txBodyScriptValidity)
      <> CBOR.encodeNullMaybe CBOR.encCBOR txmetadata
 
 deserialiseShelleyBasedTxBody
@@ -2187,7 +2163,7 @@ deserialiseShelleyBasedTxBody era bs =
               [] -- scripts
               (flip CBOR.runAnnotator fbs (return TxBodyNoScriptData))
               (fmap (flip CBOR.runAnnotator fbs) txmetadata)
-              (flip CBOR.runAnnotator fbs (return TxScriptValidityNone))
+              (flip CBOR.runAnnotator fbs (return NoFeatureValue))
         3 -> do
           txbody     <- CBOR.decCBOR
           txscripts  <- CBOR.decCBOR
@@ -2198,10 +2174,10 @@ deserialiseShelleyBasedTxBody era bs =
               (map (flip CBOR.runAnnotator fbs) txscripts)
               (flip CBOR.runAnnotator fbs (return TxBodyNoScriptData))
               (fmap (flip CBOR.runAnnotator fbs) txmetadata)
-              (flip CBOR.runAnnotator fbs (return TxScriptValidityNone))
+              (flip CBOR.runAnnotator fbs (return NoFeatureValue))
         4 -> do
           sValiditySupported <-
-            case txScriptValiditySupportedInShelleyBasedEra era of
+            case featureInShelleyBasedEra Nothing Just era of
               Nothing -> fail $ mconcat
                 [ "deserialiseShelleyBasedTxBody: Expected an era that supports the "
                 , "script validity flag but got: "
@@ -2219,7 +2195,7 @@ deserialiseShelleyBasedTxBody era bs =
               (map (flip CBOR.runAnnotator fbs) txscripts)
               (flip CBOR.runAnnotator fbs (return TxBodyNoScriptData))
               (fmap (flip CBOR.runAnnotator fbs) txmetadata)
-              (flip CBOR.runAnnotator fbs (return $ TxScriptValidity sValiditySupported scriptValidity))
+              (flip CBOR.runAnnotator fbs (return $ FeatureValue sValiditySupported scriptValidity))
         6 -> do
           sDataSupported <-
             case scriptDataSupportedInEra (shelleyBasedToCardanoEra era) of
@@ -2231,7 +2207,7 @@ deserialiseShelleyBasedTxBody era bs =
               Just supported -> return supported
 
           sValiditySupported <-
-            case txScriptValiditySupportedInShelleyBasedEra era of
+            case featureInShelleyBasedEra Nothing Just era of
               Nothing -> fail $ mconcat
                 [ "deserialiseShelleyBasedTxBody: Expected an era that supports the "
                 , "script validity flag but got: "
@@ -2257,7 +2233,7 @@ deserialiseShelleyBasedTxBody era bs =
               (map (flip CBOR.runAnnotator fbs) txscripts)
               (flip CBOR.runAnnotator fbs txscriptdata)
               (fmap (flip CBOR.runAnnotator fbs) txmetadata)
-              (flip CBOR.runAnnotator fbs (return $ TxScriptValidity sValiditySupported scriptValidity))
+              (flip CBOR.runAnnotator fbs (return $ FeatureValue sValiditySupported scriptValidity))
         _ -> fail $ "expected tx body tuple of size 2, 3, 4 or 6, got " <> show len
 
 instance IsCardanoEra era => HasTextEnvelope (TxBody era) where
@@ -2709,7 +2685,7 @@ getTxBodyContent (ShelleyTxBody era body _scripts scriptdata mAux scriptValidity
 
 fromLedgerTxBody
   :: ShelleyBasedEra era
-  -> TxScriptValidity era
+  -> FeatureValue TxScriptValidityFeature era ScriptValidity
   -> Ledger.TxBody (ShelleyLedgerEra era)
   -> TxBodyScriptData era
   -> Maybe (L.TxAuxData (ShelleyLedgerEra era))
@@ -2852,7 +2828,7 @@ fromAlonzoTxOut :: forall era ledgerera.
                 => L.AlonzoEraTxOut ledgerera
                 => Ledger.EraCrypto ledgerera ~ StandardCrypto
                 => Ledger.Value ledgerera ~ MaryValue StandardCrypto
-                => MultiAssetSupportedInEra era
+                => MultiAssetFeature era
                 -> ScriptDataSupportedInEra era
                 -> Map (L.DataHash StandardCrypto)
                        (L.Data ledgerera)
@@ -2881,7 +2857,7 @@ fromBabbageTxOut
   => ShelleyLedgerEra era ~ ledgerera
   => Ledger.EraCrypto ledgerera ~ StandardCrypto
   => Ledger.Value ledgerera ~ MaryValue StandardCrypto
-  => MultiAssetSupportedInEra era
+  => MultiAssetFeature era
   -> ScriptDataSupportedInEra era
   -> ReferenceTxInsScriptsInlineDatumsSupportedInEra era
   -> Map (L.DataHash StandardCrypto)
@@ -3285,45 +3261,35 @@ fromLedgerTxCertificates era body =
 fromLedgerTxUpdateProposal
   :: ShelleyBasedEra era
   -> Ledger.TxBody (ShelleyLedgerEra era)
-  -> TxUpdateProposal era
+  -> FeatureValue UpdateProposalFeature era UpdateProposal
 fromLedgerTxUpdateProposal era body =
   case era of
     ShelleyBasedEraShelley ->
       case body ^. L.updateTxBodyL of
-        SNothing -> TxUpdateProposalNone
-        SJust p ->
-          TxUpdateProposal UpdateProposalInShelleyEra
-                           (fromLedgerUpdate era p)
+        SNothing -> NoFeatureValue
+        SJust p -> FeatureValue UpdateProposalInShelleyEra (fromLedgerUpdate era p)
 
     ShelleyBasedEraAllegra ->
       case body ^. L.updateTxBodyL of
-        SNothing -> TxUpdateProposalNone
-        SJust p ->
-          TxUpdateProposal UpdateProposalInAllegraEra
-                           (fromLedgerUpdate era p)
+        SNothing -> NoFeatureValue
+        SJust p -> FeatureValue UpdateProposalInAllegraEra (fromLedgerUpdate era p)
 
     ShelleyBasedEraMary ->
       case body ^. L.updateTxBodyL of
-        SNothing -> TxUpdateProposalNone
-        SJust p ->
-          TxUpdateProposal UpdateProposalInMaryEra
-                           (fromLedgerUpdate era p)
+        SNothing -> NoFeatureValue
+        SJust p -> FeatureValue UpdateProposalInMaryEra (fromLedgerUpdate era p)
 
     ShelleyBasedEraAlonzo ->
       case body ^. L.updateTxBodyL of
-        SNothing -> TxUpdateProposalNone
-        SJust p ->
-          TxUpdateProposal UpdateProposalInAlonzoEra
-                           (fromLedgerUpdate era p)
+        SNothing -> NoFeatureValue
+        SJust p -> FeatureValue UpdateProposalInAlonzoEra (fromLedgerUpdate era p)
 
     ShelleyBasedEraBabbage ->
       case body ^. L.updateTxBodyL of
-        SNothing -> TxUpdateProposalNone
-        SJust p ->
-          TxUpdateProposal UpdateProposalInBabbageEra
-                           (fromLedgerUpdate era p)
+        SNothing -> NoFeatureValue
+        SJust p -> FeatureValue UpdateProposalInBabbageEra (fromLedgerUpdate era p)
 
-    ShelleyBasedEraConway -> TxUpdateProposalNone
+    ShelleyBasedEraConway -> NoFeatureValue
 
 fromLedgerTxMintValue
   :: ShelleyBasedEra era
@@ -3402,9 +3368,9 @@ getByronTxBodyContent (Annotated Byron.UnsafeTx{txInputs, txOutputs} _) =
   , txProtocolParams   = ViewTx
   , txWithdrawals      = TxWithdrawalsNone
   , txCertificates     = TxCertificatesNone
-  , txUpdateProposal   = TxUpdateProposalNone
+  , txUpdateProposal   = NoFeatureValue
   , txMintValue        = TxMintNone
-  , txScriptValidity   = TxScriptValidityNone
+  , txScriptValidity   = NoFeatureValue
   }
 
 convTxIns :: TxIns BuildTx era -> Set (L.TxIn StandardCrypto)
@@ -3497,13 +3463,13 @@ convTxUpdateProposal
   :: forall era ledgerera. ShelleyLedgerEra era ~ ledgerera
   => Ledger.EraCrypto ledgerera ~ StandardCrypto
   => ShelleyBasedEra era
-  -> TxUpdateProposal era
+  -> FeatureValue UpdateProposalFeature era UpdateProposal
   -> Either TxBodyError (StrictMaybe (Ledger.Update ledgerera))
   -- ^ 'Left' when there's protocol params conversion error, 'Right' otherwise, 'Right SNothing' means that
   -- there's no update proposal
 convTxUpdateProposal era = \case
-  TxUpdateProposalNone -> Right SNothing
-  TxUpdateProposal _ p -> bimap TxBodyProtocolParamsConversionError pure $ toLedgerUpdate era p
+  NoFeatureValue -> Right SNothing
+  FeatureValue _ p -> bimap TxBodyProtocolParamsConversionError pure $ toLedgerUpdate era p
 
 convMintValue :: TxMintValue build era -> MultiAsset StandardCrypto
 convMintValue txMintValue =
@@ -3680,7 +3646,7 @@ makeShelleyTransactionBody era@ShelleyBasedEraShelley
         scripts_
         TxBodyNoScriptData
         txAuxData
-        TxScriptValidityNone
+        NoFeatureValue
   where
     scripts_ :: [Ledger.Script StandardShelley]
     scripts_ = catMaybes
@@ -3717,7 +3683,7 @@ makeShelleyTransactionBody era@ShelleyBasedEraAllegra
         scripts_
         TxBodyNoScriptData
         txAuxData
-        TxScriptValidityNone
+        NoFeatureValue
   where
     scripts_ :: [Ledger.Script StandardAllegra]
     scripts_ = catMaybes
@@ -3756,7 +3722,7 @@ makeShelleyTransactionBody era@ShelleyBasedEraMary
         scripts
         TxBodyNoScriptData
         txAuxData
-        TxScriptValidityNone
+        NoFeatureValue
   where
     scripts :: [Ledger.Script StandardMary]
     scripts = List.nub $ catMaybes
