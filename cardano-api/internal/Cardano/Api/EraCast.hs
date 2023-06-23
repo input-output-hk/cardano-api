@@ -3,6 +3,7 @@
 
 module Cardano.Api.EraCast
   ( EraCast(..)
+  , EraCastLossy(..)
   , EraCastError(..)
   ) where
 
@@ -26,3 +27,11 @@ class EraCast (f :: Type -> Type) where
           => CardanoEra toEra
           -> f fromEra
           -> Either EraCastError (f toEra)
+
+-- | Cast a value from one era to another.  Any data contained within
+-- that is not applicable in the target era is dropped.
+class EraCastLossy (f :: Type -> Type) where
+  eraCastLossy :: ()
+    => CardanoEra toEra -- ^ The era to cast to
+    -> f fromEra -- ^ The value to cast
+    -> f toEra

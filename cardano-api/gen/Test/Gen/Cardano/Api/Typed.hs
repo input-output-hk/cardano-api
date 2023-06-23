@@ -713,10 +713,10 @@ genFeatureValueInEra :: ()
   => Alternative f
   => f a
   -> CardanoEra era
-  -> f (FeatureValue feature era a)
+  -> f (FeatureValue a feature era)
 genFeatureValueInEra gen =
   featureInEra (pure NoFeatureValue) $ \witness ->
-    pure NoFeatureValue <|> fmap (FeatureValue witness) gen
+    pure NoFeatureValue <|> (FeatureValue <$> gen <*> pure witness)
 
 genTxScriptValidity :: CardanoEra era -> Gen (TxScriptValidity era)
 genTxScriptValidity era = case txScriptValiditySupportedInCardanoEra era of
@@ -846,7 +846,29 @@ genPraosNonce = makePraosNonce <$> Gen.bytes (Range.linear 0 32)
 genMaybePraosNonce :: Gen (Maybe PraosNonce)
 genMaybePraosNonce = Gen.maybe genPraosNonce
 
-genProtocolParameters :: CardanoEra era -> Gen ProtocolParameters
+genValidFeatureValue :: ()
+  => FeatureInEra feature
+  => CardanoEra era
+  -> Gen a
+  -> Gen (FeatureValue a feature era)
+genValidFeatureValue era g =
+  featureInEra
+    (pure NoFeatureValue)
+    (\w -> FeatureValue <$> g <*> pure w)
+    era
+
+genFeatureValue :: ()
+  => FeatureInEra feature
+  => CardanoEra era
+  -> Gen a
+  -> Gen (FeatureValue a feature era)
+genFeatureValue era g =
+  featureInEra
+    (pure NoFeatureValue)
+    (\w -> pure NoFeatureValue <|> FeatureValue <$> g <*> pure w)
+    era
+
+genProtocolParameters :: CardanoEra era -> Gen (ProtocolParameters era)
 genProtocolParameters era = do
   protocolParamProtocolVersion <- (,) <$> genNat <*> genNat
   protocolParamDecentralization <- Gen.maybe genRational
@@ -865,7 +887,7 @@ genProtocolParameters era = do
   protocolParamPoolPledgeInfluence <- genRationalInt64
   protocolParamMonetaryExpansion <- genRational
   protocolParamTreasuryCut <- genRational
-  protocolParamUTxOCostPerWord <- featureInEra @ProtocolUTxOCostPerWordFeature (pure Nothing) (const (Just <$> genLovelace)) era
+  protocolParamUTxOCostPerWord <- genFeatureValue era genLovelace
   protocolParamCostModels <- pure mempty
   --TODO: Babbage figure out how to deal with
   -- asymmetric cost model JSON instances
@@ -875,12 +897,12 @@ genProtocolParameters era = do
   protocolParamMaxValueSize <- Gen.maybe genNat
   protocolParamCollateralPercent <- Gen.maybe genNat
   protocolParamMaxCollateralInputs <- Gen.maybe genNat
-  protocolParamUTxOCostPerByte <- featureInEra @ProtocolUTxOCostPerByteFeature (pure Nothing) (const (Just <$> genLovelace)) era
+  protocolParamUTxOCostPerByte <- genFeatureValue era genLovelace
 
   pure ProtocolParameters {..}
 
 -- | Generate valid protocol parameters which pass validations in Cardano.Api.ProtocolParameters
-genValidProtocolParameters :: CardanoEra era -> Gen ProtocolParameters
+genValidProtocolParameters :: CardanoEra era -> Gen (ProtocolParameters era)
 genValidProtocolParameters era =
   ProtocolParameters
     <$> ((,) <$> genNat <*> genNat)
@@ -901,7 +923,7 @@ genValidProtocolParameters era =
     <*> genRational
     <*> genRational
     -- 'Just' is required by checks in Cardano.Api.ProtocolParameters
-    <*> featureInEra @ProtocolUTxOCostPerWordFeature (pure Nothing) (const (Just <$> genLovelace)) era
+    <*> genValidFeatureValue era genLovelace
     <*> return mempty
     --TODO: Babbage figure out how to deal with
     -- asymmetric cost model JSON instances
@@ -912,7 +934,7 @@ genValidProtocolParameters era =
     <*> fmap Just genNat
     <*> fmap Just genNat
     <*> fmap Just genNat
-    <*> featureInEra @ProtocolUTxOCostPerByteFeature (pure Nothing) (const (Just <$> genLovelace)) era
+    <*> genValidFeatureValue era genLovelace
 
 genProtocolParametersUpdate :: CardanoEra era -> Gen ProtocolParametersUpdate
 genProtocolParametersUpdate era = do

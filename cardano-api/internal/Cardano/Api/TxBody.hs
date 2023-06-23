@@ -1746,7 +1746,7 @@ data TxBodyContent build era =
        txMetadata         :: TxMetadataInEra era,
        txAuxScripts       :: TxAuxScripts era,
        txExtraKeyWits     :: TxExtraKeyWitnesses era,
-       txProtocolParams   :: BuildTxWith build (Maybe ProtocolParameters),
+       txProtocolParams   :: BuildTxWith build (Maybe (ProtocolParameters era)),
        txWithdrawals      :: TxWithdrawals  build era,
        txCertificates     :: TxCertificates build era,
        txUpdateProposal   :: TxUpdateProposal era,
@@ -1821,7 +1821,7 @@ setTxAuxScripts v txBodyContent = txBodyContent { txAuxScripts = v }
 setTxExtraKeyWits :: TxExtraKeyWitnesses era -> TxBodyContent build era -> TxBodyContent build era
 setTxExtraKeyWits v txBodyContent = txBodyContent { txExtraKeyWits = v }
 
-setTxProtocolParams :: BuildTxWith build (Maybe ProtocolParameters) -> TxBodyContent build era -> TxBodyContent build era
+setTxProtocolParams :: BuildTxWith build (Maybe (ProtocolParameters era)) -> TxBodyContent build era -> TxBodyContent build era
 setTxProtocolParams v txBodyContent = txBodyContent { txProtocolParams = v }
 
 setTxWithdrawals :: TxWithdrawals build era -> TxBodyContent build era -> TxBodyContent build era
@@ -2550,7 +2550,7 @@ validateTxBodyContent
   :: ShelleyBasedEra era
   -> TxBodyContent BuildTx era
   -> Either TxBodyError ()
-validateTxBodyContent era txBodContent@TxBodyContent {
+validateTxBodyContent sbe txBodContent@TxBodyContent {
                              txIns,
                              txInsCollateral,
                              txOuts,
@@ -2562,27 +2562,27 @@ validateTxBodyContent era txBodContent@TxBodyContent {
                     [ toAlonzoLanguage (AnyPlutusScriptVersion v)
                     | (_, AnyScriptWitness (PlutusScriptWitness _ v _ _ _ _)) <- witnesses
                     ]
-  in case era of
+  in case sbe of
        ShelleyBasedEraShelley -> do
          validateTxIns txIns
          guardShelleyTxInsOverflow (map fst txIns)
-         validateTxOuts era txOuts
+         validateTxOuts sbe txOuts
          validateMetadata txMetadata
        ShelleyBasedEraAllegra -> do
          validateTxIns txIns
          guardShelleyTxInsOverflow (map fst txIns)
-         validateTxOuts era txOuts
+         validateTxOuts sbe txOuts
          validateMetadata txMetadata
        ShelleyBasedEraMary -> do
          validateTxIns txIns
          guardShelleyTxInsOverflow (map fst txIns)
-         validateTxOuts era txOuts
+         validateTxOuts sbe txOuts
          validateMetadata txMetadata
          validateMintValue txMintValue
        ShelleyBasedEraAlonzo -> do
          validateTxIns txIns
          guardShelleyTxInsOverflow (map fst txIns)
-         validateTxOuts era txOuts
+         validateTxOuts sbe txOuts
          validateMetadata txMetadata
          validateMintValue txMintValue
          validateTxInsCollateral txInsCollateral languages
@@ -2590,14 +2590,14 @@ validateTxBodyContent era txBodContent@TxBodyContent {
        ShelleyBasedEraBabbage -> do
          validateTxIns txIns
          guardShelleyTxInsOverflow (map fst txIns)
-         validateTxOuts era txOuts
+         validateTxOuts sbe txOuts
          validateMetadata txMetadata
          validateMintValue txMintValue
          validateTxInsCollateral txInsCollateral languages
          validateProtocolParameters txProtocolParams languages
        ShelleyBasedEraConway -> do
          validateTxIns txIns
-         validateTxOuts era txOuts
+         validateTxOuts sbe txOuts
          validateMetadata txMetadata
          validateMintValue txMintValue
          validateTxInsCollateral txInsCollateral languages
@@ -2610,7 +2610,7 @@ validateMetadata txMetadata =
     TxMetadataInEra _ m -> first TxBodyMetadataError (validateTxMetadata m)
 
 validateProtocolParameters
-  :: BuildTxWith BuildTx (Maybe ProtocolParameters)
+  :: BuildTxWith BuildTx (Maybe (ProtocolParameters era))
   -> Set Alonzo.Language
   -> Either TxBodyError ()
 validateProtocolParameters txProtocolParams languages =
@@ -3569,7 +3569,7 @@ convScriptData era txOuts scriptWitnesses =
 convPParamsToScriptIntegrityHash
   :: L.AlonzoEraPParams (ShelleyLedgerEra era)
   => ShelleyBasedEra era
-  -> BuildTxWith BuildTx (Maybe ProtocolParameters)
+  -> BuildTxWith BuildTx (Maybe (ProtocolParameters era))
   -> Alonzo.Redeemers (ShelleyLedgerEra era)
   -> Alonzo.TxDats (ShelleyLedgerEra era)
   -> Set Alonzo.Language
