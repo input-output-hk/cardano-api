@@ -50,6 +50,7 @@ module Cardano.Api.Tx (
 import           Cardano.Api.Address
 import           Cardano.Api.Certificate
 import           Cardano.Api.Eras
+import           Cardano.Api.Feature
 import           Cardano.Api.HasTypeProxy
 import           Cardano.Api.Keys.Byron
 import           Cardano.Api.Keys.Class
@@ -490,13 +491,13 @@ getTxBody (ShelleyTx era tx') =
                     (Map.elems scriptWits)
                     TxBodyNoScriptData
                     (strictMaybeToMaybe txAuxData)
-                    TxScriptValidityNone
+                    NoFeatureValue
 
     getAlonzoTxBody :: forall ledgerera.
                        ShelleyLedgerEra era ~ ledgerera
                     => L.AlonzoEraTx ledgerera
                     => ScriptDataSupportedInEra era
-                    -> TxScriptValiditySupportedInEra era
+                    -> TxScriptValidityFeature era
                     -> L.Tx ledgerera
                     -> TxBody era
     getAlonzoTxBody scriptDataInEra txScriptValidityInEra tx =
@@ -510,7 +511,7 @@ getTxBody (ShelleyTx era tx') =
                     (Map.elems scriptWits)
                     (TxBodyScriptData scriptDataInEra datsWits redeemerWits)
                     (strictMaybeToMaybe txAuxData)
-                    (TxScriptValidity txScriptValidityInEra (isValidToScriptValidity isValid))
+                    (FeatureValue txScriptValidityInEra (isValidToScriptValidity isValid))
 
 getTxWitnesses :: forall era. Tx era -> [KeyWitness era]
 getTxWitnesses (ByronTx Byron.ATxAux { Byron.aTaWitness = witnesses }) =
@@ -607,7 +608,7 @@ makeSignedTransaction witnesses (ShelleyTxBody era txbody
         (txCommon
          & L.witsTxL . L.datsTxWitsL .~ datums
          & L.witsTxL . L.rdmrsTxWitsL .~ redeemers
-         & L.isValidTxL .~ txScriptValidityToIsValid scriptValidity)
+         & L.isValidTxL .~ scriptValidityToIsValid (valueOrDefault defaultScriptValidity scriptValidity))
       where
         (datums, redeemers) =
           case txscriptdata of

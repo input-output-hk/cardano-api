@@ -3,6 +3,7 @@
 
 module Cardano.Api.EraCast
   ( EraCast(..)
+  , EraCastLossy(..)
   , EraCastError(..)
   ) where
 
@@ -26,3 +27,9 @@ class EraCast (f :: Type -> Type) where
           => CardanoEra toEra
           -> f fromEra
           -> Either EraCastError (f toEra)
+
+class EraCastLossy (f :: Type -> Type) where
+  eraCastLossy :: ()
+    => CardanoEra toEra
+    -> f fromEra
+    -> f toEra

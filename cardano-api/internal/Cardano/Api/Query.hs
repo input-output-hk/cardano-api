@@ -237,10 +237,10 @@ data QueryInShelleyBasedEra era result where
     :: QueryInShelleyBasedEra era EpochNo
 
   QueryGenesisParameters
-    :: QueryInShelleyBasedEra era GenesisParameters
+    :: QueryInShelleyBasedEra era (GenesisParameters era)
 
   QueryProtocolParameters
-    :: QueryInShelleyBasedEra era ProtocolParameters
+    :: QueryInShelleyBasedEra era (ProtocolParameters era)
 
   QueryProtocolParametersUpdate
     :: QueryInShelleyBasedEra era
@@ -861,9 +861,9 @@ fromConsensusQueryResultShelleyBased _ QueryEpoch q' epoch =
       Consensus.GetEpochNo -> epoch
       _                    -> fromConsensusQueryResultMismatch
 
-fromConsensusQueryResultShelleyBased _ QueryGenesisParameters q' r' =
+fromConsensusQueryResultShelleyBased sbe QueryGenesisParameters q' r' =
     case q' of
-      Consensus.GetGenesisConfig -> fromShelleyGenesis
+      Consensus.GetGenesisConfig -> fromShelleyGenesis sbe
                                       (Consensus.getCompactGenesis r')
       _                          -> fromConsensusQueryResultMismatch
 

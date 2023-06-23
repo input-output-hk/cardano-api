@@ -16,7 +16,9 @@ module Cardano.Api.GenesisParameters (
 
   ) where
 
-import           Cardano.Api.Eras (ShelleyBasedEra (ShelleyBasedEraShelley))
+import           Cardano.Api.EraCast
+import           Cardano.Api.Eras (ShelleyBasedEra (ShelleyBasedEraShelley),
+                   shelleyBasedToCardanoEra)
 import           Cardano.Api.NetworkId
 import           Cardano.Api.ProtocolParameters
 import           Cardano.Api.Value
@@ -33,7 +35,7 @@ import           Data.Time (NominalDiffTime, UTCTime)
 -- Genesis parameters
 --
 
-data GenesisParameters =
+data GenesisParameters era =
      GenesisParameters {
 
        -- | The reference time the system started. The time of slot zero.
@@ -92,7 +94,7 @@ data GenesisParameters =
 
        -- | The initial values of the updateable 'ProtocolParameters'.
        --
-       protocolInitialUpdateableProtocolParameters :: ProtocolParameters
+       protocolInitialUpdateableProtocolParameters :: ProtocolParameters era
      }
 
 
@@ -100,8 +102,8 @@ data GenesisParameters =
 -- Conversion functions
 --
 
-fromShelleyGenesis :: Shelley.ShelleyGenesis Ledger.StandardCrypto -> GenesisParameters
-fromShelleyGenesis
+fromShelleyGenesis :: ShelleyBasedEra era -> Shelley.ShelleyGenesis Ledger.StandardCrypto -> GenesisParameters era
+fromShelleyGenesis sbe
     Shelley.ShelleyGenesis {
       Shelley.sgSystemStart
     , Shelley.sgNetworkMagic
@@ -133,7 +135,5 @@ fromShelleyGenesis
     , protocolParamUpdateQuorum           = fromIntegral sgUpdateQuorum
     , protocolParamMaxLovelaceSupply      = Lovelace
                                               (fromIntegral sgMaxLovelaceSupply)
-    , protocolInitialUpdateableProtocolParameters = fromLedgerPParams
-                                                      ShelleyBasedEraShelley
-                                                      sgProtocolParams
+    , protocolInitialUpdateableProtocolParameters = eraCastLossy (shelleyBasedToCardanoEra sbe) (fromLedgerPParams ShelleyBasedEraShelley sgProtocolParams)
     }

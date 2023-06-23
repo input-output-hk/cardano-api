@@ -76,7 +76,7 @@ queryStateForBalancedTx :: ()
       ( Either
           QueryConvenienceError
           ( UTxO era
-          , ProtocolParameters
+          , ProtocolParameters era
           , EraHistory CardanoMode
           , SystemStart
           , Set PoolId

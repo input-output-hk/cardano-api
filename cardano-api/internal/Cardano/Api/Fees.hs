@@ -44,6 +44,7 @@ import           Cardano.Api.Address
 import           Cardano.Api.Certificate
 import           Cardano.Api.Eras
 import           Cardano.Api.Error
+import           Cardano.Api.Feature
 import           Cardano.Api.NetworkId
 import           Cardano.Api.ProtocolParameters
 import           Cardano.Api.Query
@@ -901,7 +902,7 @@ makeTransactionBodyAutoBalance
      IsShelleyBasedEra era
   => SystemStart
   -> LedgerEpochInfo
-  -> ProtocolParameters
+  -> ProtocolParameters era
   -> Set PoolId       -- ^ The set of registered stake pools, that are being
                       --   unregistered in this transaction.
   -> Map StakeCredential Lovelace
@@ -939,7 +940,7 @@ makeTransactionBodyAutoBalance systemstart history pparams poolids stakeDelegDep
       case Map.mapEither id exUnitsMap of
         (failures, exUnitsMap') ->
           handleExUnitsErrors
-            (txScriptValidityToScriptValidity (txScriptValidity txbodycontent))
+            (valueOrDefault defaultScriptValidity (txScriptValidity txbodycontent))
             failures
             exUnitsMap'
 
@@ -1062,7 +1063,7 @@ makeTransactionBodyAutoBalance systemstart history pparams poolids stakeDelegDep
    -- TODO: Bug Jared to expose a function from the ledger that returns total and return collateral.
    calcReturnAndTotalCollateral
      :: Lovelace -- ^ Fee
-     -> ProtocolParameters
+     -> ProtocolParameters era -- ^ Protocol parameters
      -> TxInsCollateral era -- ^ From the initial TxBodyContent
      -> TxReturnCollateral CtxTx era -- ^ From the initial TxBodyContent
      -> TxTotalCollateral era -- ^ From the initial TxBodyContent

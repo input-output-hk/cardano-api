@@ -1,21 +1,28 @@
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Cardano.Api.Feature
   ( FeatureValue (..)
   , FeatureInEra(..)
+  , Flip(..)
   , featureInShelleyBasedEra
   , valueOrDefault
   , asFeatureValue
   , asFeatureValueInShelleyBasedEra
-  , isFeatureValue
+  , existsFeatureValue  , eraCastLossyFeatureValue
+  , (.:?^)
   ) where
 
+import           Cardano.Api.EraCast
 import           Cardano.Api.Eras
 
+import qualified Data.Aeson.KeyMap as KM
+import           Data.Aeson.Types
 import           Data.Kind
 
 -- | A class for features that are supported in some eras but not others.
@@ -55,12 +62,63 @@ data FeatureValue feature era a where
 deriving instance (Eq a, Eq (feature era)) => Eq (FeatureValue feature era a)
 deriving instance (Show a, Show (feature era)) => Show (FeatureValue feature era a)
 
+instance ToJSON a => ToJSON (FeatureValue feature era a) where
+  toJSON v =
+    toJSON $
+      case v of
+        NoFeatureValue -> Nothing
+        FeatureValue _ a -> Just a
+
+instance (IsCardanoEra era, FromJSON a, FeatureInEra feature) => FromJSON (FeatureValue feature era a) where
+  parseJSON v =
+    featureInEra
+      (pure NoFeatureValue)
+      (\fe -> FeatureValue fe <$> parseJSON v)
+      cardanoEra
+
+newtype Flip t a b = Flip { unFlip :: t b a }
+
+instance FeatureInEra feature => EraCastLossy (Flip (FeatureValue feature) a) where
+  eraCastLossy era (Flip fv) = Flip $ eraCastLossyFeatureValue era fv
+
+eraCastLossyFeatureValue :: ()
+  => FeatureInEra feature
+  => CardanoEra toEra
+  -> FeatureValue feature fromEra a
+  -> FeatureValue feature toEra a
+eraCastLossyFeatureValue era fv =
+  case fv of
+    FeatureValue _ a -> featureInEra NoFeatureValue (\fe -> FeatureValue fe a) era
+    NoFeatureValue -> NoFeatureValue
+
+
+(.:?^) :: (IsCardanoEra era, FromJSON a, FeatureInEra feature) => Object -> Key -> Parser (FeatureValue feature era a)
+(.:?^) = explicitParseFieldFeatureValue' parseJSON
+
+-- | Variant of '.:!' with explicit parser function.
+explicitParseFieldFeatureValue' :: ()
+  => IsCardanoEra era
+  => FeatureInEra feature
+  => (Value -> Parser a)
+  -> Object
+  -> Key
+  -> Parser (FeatureValue feature era a)
+explicitParseFieldFeatureValue' p obj key =
+  let era = cardanoEra in
+  case KM.lookup key obj of
+    Nothing -> pure NoFeatureValue
+    Just v ->
+      featureInEra
+        (fail $ "The field " <> show key <> " is not valid for the era " <> show era <> ".")
+        (\fe -> FeatureValue fe <$> p v)
+        era
+
 -- | Determine if a value is defined.
 --
 -- If the value is not defined, it could be because the feature is not supported or
 -- because the feature is supported but the value is not available.
-isFeatureValue :: FeatureValue feature era a -> Bool
-isFeatureValue = \case
+existsFeatureValue :: FeatureValue feature era a -> Bool
+existsFeatureValue = \case
   NoFeatureValue -> False
   FeatureValue _ _ -> True
 
