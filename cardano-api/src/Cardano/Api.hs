@@ -758,6 +758,10 @@ module Cardano.Api (
     getOpCertCount,
     issueOperationalCertificate,
 
+    -- * Constitutional Committee keys
+    CommitteeColdKey,
+    CommitteeHotKey,
+
     -- * Genesis file
     -- | Types and functions needed to inspect or create a genesis file.
     GenesisKey,
@@ -877,6 +881,13 @@ module Cardano.Api (
     querySystemStart,
     queryUtxo,
     determineEraExpr,
+
+    -- * Governance
+
+    -- ** Governance Committee
+    makeCommitteeDelegationCertificate,
+    makeCommitteeHotKeyUnregistrationCertificate,
+
   ) where
 
 import           Cardano.Api.Address

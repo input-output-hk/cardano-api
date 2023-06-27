@@ -22,6 +22,9 @@ module Cardano.Api.Certificate (
     StakePoolRelay(..),
     StakePoolMetadataReference(..),
 
+    makeCommitteeDelegationCertificate,
+    makeCommitteeHotKeyUnregistrationCertificate,
+
     -- * Special certificates
     makeMIRCertificate,
     makeGenesisKeyDelegationCertificate,
@@ -87,9 +90,18 @@ data Certificate =
    | StakePoolRetirementCertificate   PoolId EpochNo
 
      -- Special certificates
-   | GenesisKeyDelegationCertificate (Hash GenesisKey)
-                                     (Hash GenesisDelegateKey)
-                                     (Hash VrfKey)
+   | GenesisKeyDelegationCertificate
+      (Hash GenesisKey)
+      (Hash GenesisDelegateKey)
+      (Hash VrfKey)
+
+   | CommitteeDelegationCertificate
+      (Hash CommitteeColdKey)
+      (Hash CommitteeHotKey)
+
+   | CommitteeHotKeyUnregistrationCertificate
+      (Hash CommitteeColdKey)
+
    | MIRCertificate MIRPot MIRTarget
 
   deriving stock (Eq, Show)
@@ -114,6 +126,8 @@ instance HasTextEnvelope Certificate where
       StakePoolRegistrationCertificate{}      -> "Pool registration"
       StakePoolRetirementCertificate{}        -> "Pool retirement"
       GenesisKeyDelegationCertificate{}       -> "Genesis key delegation"
+      CommitteeDelegationCertificate{}               -> "Constitution Committee key delegation"
+      CommitteeHotKeyUnregistrationCertificate{}     -> "Constitution Committee hot key unregistration"
       MIRCertificate{}                        -> "MIR"
 
 -- | The 'MIRTarget' determines the target of a 'MIRCertificate'.
@@ -203,6 +217,17 @@ makeGenesisKeyDelegationCertificate :: Hash GenesisKey
                                     -> Certificate
 makeGenesisKeyDelegationCertificate = GenesisKeyDelegationCertificate
 
+makeCommitteeDelegationCertificate :: ()
+  => Hash CommitteeColdKey
+  -> Hash CommitteeHotKey
+  -> Certificate
+makeCommitteeDelegationCertificate = CommitteeDelegationCertificate
+
+makeCommitteeHotKeyUnregistrationCertificate :: ()
+  => Hash CommitteeColdKey
+  -> Certificate
+makeCommitteeHotKeyUnregistrationCertificate = CommitteeHotKeyUnregistrationCertificate
+
 makeMIRCertificate :: MIRPot -> MIRTarget -> Certificate
 makeMIRCertificate = MIRCertificate
 
@@ -251,6 +276,17 @@ toShelleyCertificate (GenesisKeyDelegationCertificate
         genesiskh
         delegatekh
         vrfkh
+
+toShelleyCertificate
+  ( CommitteeDelegationCertificate
+    (CommitteeColdKeyHash _ckh)
+    (CommitteeHotKeyHash  _hkh)
+  ) = error "TODO CIP-1694 Need ledger types for CommitteeDelegationCertificate"
+
+toShelleyCertificate
+  ( CommitteeHotKeyUnregistrationCertificate
+    (CommitteeColdKeyHash _ckh)
+  ) = error "TODO CIP-1694 Need ledger types for CommitteeHotKeyUnregistrationCertificate"
 
 toShelleyCertificate (MIRCertificate mirpot (StakeAddressesMIR amounts)) =
     Shelley.DCertMir $

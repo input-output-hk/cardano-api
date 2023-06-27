@@ -17,6 +17,8 @@
 module Cardano.Api.Keys.Shelley (
 
     -- * Key types
+    CommitteeColdKey,
+    CommitteeHotKey,
     PaymentKey,
     PaymentExtendedKey,
     StakeKey,
@@ -666,6 +668,203 @@ instance CastVerificationKeyRole GenesisKey PaymentKey where
     castVerificationKey (GenesisVerificationKey (Shelley.VKey vk)) =
       PaymentVerificationKey (Shelley.VKey vk)
 
+
+--
+-- Constitutional Committee Hot Keys
+--
+
+type KeyRoleCommitteeHotKey = Shelley.Genesis -- TODO CIP-1694 this should be a newtype Shelley.CommitteeHotKey
+
+data CommitteeHotKey
+
+instance HasTypeProxy CommitteeHotKey where
+    data AsType CommitteeHotKey = AsCommitteeHotKey
+    proxyToAsType _ = AsCommitteeHotKey
+
+instance Key CommitteeHotKey where
+
+    newtype VerificationKey CommitteeHotKey =
+        CommitteeHotVerificationKey (Shelley.VKey KeyRoleCommitteeHotKey StandardCrypto)
+      deriving stock (Eq)
+      deriving (Show, IsString) via UsingRawBytesHex (VerificationKey CommitteeHotKey)
+      deriving newtype (ToCBOR, FromCBOR)
+      deriving anyclass SerialiseAsCBOR
+
+    newtype SigningKey CommitteeHotKey =
+        CommitteeHotSigningKey (Shelley.SignKeyDSIGN StandardCrypto)
+      deriving (Show, IsString) via UsingRawBytesHex (SigningKey CommitteeHotKey)
+      deriving newtype (ToCBOR, FromCBOR)
+      deriving anyclass SerialiseAsCBOR
+
+    deterministicSigningKey :: AsType CommitteeHotKey -> Crypto.Seed -> SigningKey CommitteeHotKey
+    deterministicSigningKey AsCommitteeHotKey seed =
+        CommitteeHotSigningKey (Crypto.genKeyDSIGN seed)
+
+    deterministicSigningKeySeedSize :: AsType CommitteeHotKey -> Word
+    deterministicSigningKeySeedSize AsCommitteeHotKey =
+        Crypto.seedSizeDSIGN proxy
+      where
+        proxy :: Proxy (Shelley.DSIGN StandardCrypto)
+        proxy = Proxy
+
+    getVerificationKey :: SigningKey CommitteeHotKey -> VerificationKey CommitteeHotKey
+    getVerificationKey (CommitteeHotSigningKey sk) =
+        CommitteeHotVerificationKey (Shelley.VKey (Crypto.deriveVerKeyDSIGN sk))
+
+    verificationKeyHash :: VerificationKey CommitteeHotKey -> Hash CommitteeHotKey
+    verificationKeyHash (CommitteeHotVerificationKey vkey) =
+        CommitteeHotKeyHash (Shelley.hashKey vkey)
+
+
+instance SerialiseAsRawBytes (VerificationKey CommitteeHotKey) where
+    serialiseToRawBytes (CommitteeHotVerificationKey (Shelley.VKey vk)) =
+      Crypto.rawSerialiseVerKeyDSIGN vk
+
+    deserialiseFromRawBytes (AsVerificationKey AsCommitteeHotKey) bs =
+      maybeToRight (SerialiseAsRawBytesError "Unable to deserialise VerificationKey Constitutional Committee Hot Key") $
+        CommitteeHotVerificationKey . Shelley.VKey <$>
+          Crypto.rawDeserialiseVerKeyDSIGN bs
+
+instance SerialiseAsRawBytes (SigningKey CommitteeHotKey) where
+    serialiseToRawBytes (CommitteeHotSigningKey sk) =
+      Crypto.rawSerialiseSignKeyDSIGN sk
+
+    deserialiseFromRawBytes (AsSigningKey AsCommitteeHotKey) bs =
+      maybeToRight (SerialiseAsRawBytesError "Unable to deserialise SigningKey Constitional Committee Hot Key") $
+        CommitteeHotSigningKey <$> Crypto.rawDeserialiseSignKeyDSIGN bs
+
+
+newtype instance Hash CommitteeHotKey =
+    CommitteeHotKeyHash (Shelley.KeyHash KeyRoleCommitteeHotKey StandardCrypto)
+  deriving stock (Eq, Ord)
+  deriving (Show, IsString) via UsingRawBytesHex (Hash CommitteeHotKey)
+  deriving (ToCBOR, FromCBOR) via UsingRawBytes (Hash CommitteeHotKey)
+  deriving anyclass SerialiseAsCBOR
+
+instance SerialiseAsRawBytes (Hash CommitteeHotKey) where
+    serialiseToRawBytes (CommitteeHotKeyHash (Shelley.KeyHash vkh)) =
+      Crypto.hashToBytes vkh
+
+    deserialiseFromRawBytes (AsHash AsCommitteeHotKey) bs =
+      maybeToRight (SerialiseAsRawBytesError "Unable to deserialise Hash Constitional Committee Hot Key") $
+        CommitteeHotKeyHash . Shelley.KeyHash <$> Crypto.hashFromBytes bs
+
+instance HasTextEnvelope (VerificationKey CommitteeHotKey) where
+    textEnvelopeType _ = "ConstitionalCommitteeHotVerificationKey_"
+                      <> fromString (Crypto.algorithmNameDSIGN proxy)
+      where
+        proxy :: Proxy (Shelley.DSIGN StandardCrypto)
+        proxy = Proxy
+
+instance HasTextEnvelope (SigningKey CommitteeHotKey) where
+    textEnvelopeType _ = "ConstitionalCommitteeHotSigningKey_"
+                      <> fromString (Crypto.algorithmNameDSIGN proxy)
+      where
+        proxy :: Proxy (Shelley.DSIGN StandardCrypto)
+        proxy = Proxy
+
+instance CastVerificationKeyRole CommitteeHotKey PaymentKey where
+    castVerificationKey (CommitteeHotVerificationKey (Shelley.VKey vk)) =
+      PaymentVerificationKey (Shelley.VKey vk)
+
+
+--
+-- Constitutional Committee Cold Keys
+--
+
+type KeyRoleCommitteeColdKey = Shelley.Genesis -- TODO CIP-1694 this should be a newtype Shelley.CommitteeColdKey
+
+data CommitteeColdKey
+
+instance HasTypeProxy CommitteeColdKey where
+    data AsType CommitteeColdKey = AsCommitteeColdKey
+    proxyToAsType _ = AsCommitteeColdKey
+
+instance Key CommitteeColdKey where
+
+    newtype VerificationKey CommitteeColdKey =
+        CommitteeColdVerificationKey (Shelley.VKey KeyRoleCommitteeColdKey StandardCrypto)
+      deriving stock (Eq)
+      deriving (Show, IsString) via UsingRawBytesHex (VerificationKey CommitteeColdKey)
+      deriving newtype (ToCBOR, FromCBOR)
+      deriving anyclass SerialiseAsCBOR
+
+    newtype SigningKey CommitteeColdKey =
+        CommitteeColdSigningKey (Shelley.SignKeyDSIGN StandardCrypto)
+      deriving (Show, IsString) via UsingRawBytesHex (SigningKey CommitteeColdKey)
+      deriving newtype (ToCBOR, FromCBOR)
+      deriving anyclass SerialiseAsCBOR
+
+    deterministicSigningKey :: AsType CommitteeColdKey -> Crypto.Seed -> SigningKey CommitteeColdKey
+    deterministicSigningKey AsCommitteeColdKey seed =
+        CommitteeColdSigningKey (Crypto.genKeyDSIGN seed)
+
+    deterministicSigningKeySeedSize :: AsType CommitteeColdKey -> Word
+    deterministicSigningKeySeedSize AsCommitteeColdKey =
+        Crypto.seedSizeDSIGN proxy
+      where
+        proxy :: Proxy (Shelley.DSIGN StandardCrypto)
+        proxy = Proxy
+
+    getVerificationKey :: SigningKey CommitteeColdKey -> VerificationKey CommitteeColdKey
+    getVerificationKey (CommitteeColdSigningKey sk) =
+        CommitteeColdVerificationKey (Shelley.VKey (Crypto.deriveVerKeyDSIGN sk))
+
+    verificationKeyHash :: VerificationKey CommitteeColdKey -> Hash CommitteeColdKey
+    verificationKeyHash (CommitteeColdVerificationKey vkey) =
+        CommitteeColdKeyHash (Shelley.hashKey vkey)
+
+
+instance SerialiseAsRawBytes (VerificationKey CommitteeColdKey) where
+    serialiseToRawBytes (CommitteeColdVerificationKey (Shelley.VKey vk)) =
+      Crypto.rawSerialiseVerKeyDSIGN vk
+
+    deserialiseFromRawBytes (AsVerificationKey AsCommitteeColdKey) bs =
+      maybeToRight (SerialiseAsRawBytesError "Unable to deserialise VerificationKey Constitutional Committee Cold Key") $
+        CommitteeColdVerificationKey . Shelley.VKey <$>
+          Crypto.rawDeserialiseVerKeyDSIGN bs
+
+instance SerialiseAsRawBytes (SigningKey CommitteeColdKey) where
+    serialiseToRawBytes (CommitteeColdSigningKey sk) =
+      Crypto.rawSerialiseSignKeyDSIGN sk
+
+    deserialiseFromRawBytes (AsSigningKey AsCommitteeColdKey) bs =
+      maybeToRight (SerialiseAsRawBytesError "Unable to deserialise SigningKey Constitional Committee Cold Key") $
+        CommitteeColdSigningKey <$> Crypto.rawDeserialiseSignKeyDSIGN bs
+
+
+newtype instance Hash CommitteeColdKey =
+    CommitteeColdKeyHash (Shelley.KeyHash KeyRoleCommitteeColdKey StandardCrypto)
+  deriving stock (Eq, Ord)
+  deriving (Show, IsString) via UsingRawBytesHex (Hash CommitteeColdKey)
+  deriving (ToCBOR, FromCBOR) via UsingRawBytes (Hash CommitteeColdKey)
+  deriving anyclass SerialiseAsCBOR
+
+instance SerialiseAsRawBytes (Hash CommitteeColdKey) where
+    serialiseToRawBytes (CommitteeColdKeyHash (Shelley.KeyHash vkh)) =
+      Crypto.hashToBytes vkh
+
+    deserialiseFromRawBytes (AsHash AsCommitteeColdKey) bs =
+      maybeToRight (SerialiseAsRawBytesError "Unable to deserialise Hash Constitional Committee Cold Key") $
+        CommitteeColdKeyHash . Shelley.KeyHash <$> Crypto.hashFromBytes bs
+
+instance HasTextEnvelope (VerificationKey CommitteeColdKey) where
+    textEnvelopeType _ = "ConstitionalCommitteeColdVerificationKey_"
+                      <> fromString (Crypto.algorithmNameDSIGN proxy)
+      where
+        proxy :: Proxy (Shelley.DSIGN StandardCrypto)
+        proxy = Proxy
+
+instance HasTextEnvelope (SigningKey CommitteeColdKey) where
+    textEnvelopeType _ = "ConstitionalCommitteeColdSigningKey_"
+                      <> fromString (Crypto.algorithmNameDSIGN proxy)
+      where
+        proxy :: Proxy (Shelley.DSIGN StandardCrypto)
+        proxy = Proxy
+
+instance CastVerificationKeyRole CommitteeColdKey PaymentKey where
+    castVerificationKey (CommitteeColdVerificationKey (Shelley.VKey vk)) =
+      PaymentVerificationKey (Shelley.VKey vk)
 
 --
 -- Shelley genesis extended ed25519 keys
