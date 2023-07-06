@@ -13,8 +13,8 @@ repository cardano-haskell-packages
 -- See CONTRIBUTING for information about these, including some Nix commands
 -- you need to run if you change them
 index-state:
-  , hackage.haskell.org 2023-07-02T00:00:00Z
-  , cardano-haskell-packages 2023-07-02T00:00:00Z
+  , hackage.haskell.org 2023-07-03T00:00:00Z
+  , cardano-haskell-packages 2023-07-06T00:00:00Z
   -- , hackage.haskell.org 2023-07-05T00:00:00Z
   -- , cardano-haskell-packages 2023-07-05T00:00:00Z
 
@@ -46,37 +46,11 @@ write-ghc-environment-files: always
 
 source-repository-package
   type: git
-  location: git@github.com:input-output-hk/ouroboros-consensus.git
-  tag: b2a934e5a545afc312b58768caa31d292a5cfd68
-  --sha256: 04z1p8kvqckcwa9812kqf4wd72dlvq8wdizb5cpq4x3v0i204ryw
-  subdir: 
+  location: https://github.com/input-output-hk/ouroboros-consensus.git
+  tag: aad78dfcba78215e63a4fa04219b5f0498fcfc13
+  --sha256: sha256-g9zRIGCxUSTk7FzaNhX0UeSiWtdHdcDcFcniCnTigXs=
+  subdir:
     ouroboros-consensus-cardano
     ouroboros-consensus-protocol
     ouroboros-consensus-diffusion
     ouroboros-consensus
-
--- source-repository-package
---   type: git
---   location: git@github.com:input-output-hk/plutus.git
---   tag: e32264af9b56de5585009f30b2689e6481b273ec
---   subdir: plutus-ledger-api
-
-source-repository-package
-  type: git
-  location: https://github.com/input-output-hk/cardano-ledger.git
-  tag: 9b3a09485f1ba14ce8dc267d5596f85116ce5330
-  --sha256: 0ldwf90ybbs89vww4jm4z9k7cf6lhmjlb3znpgm17rf6rifjda7y
-  subdir:
-    eras/shelley/impl
-    eras/conway/impl
-    eras/allegra/impl
-    eras/mary/impl
-    eras/babbage/impl
-    eras/babbage/test-suite
-    eras/alonzo/impl
-    eras/alonzo/test-suite
-    libs/cardano-ledger-api
-    libs/cardano-ledger-core
-    eras/conway/test-suite
-    libs/cardano-protocol-tpraos
-    libs/cardano-ledger-pretty
