@@ -6,9 +6,12 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 
 module Cardano.Api.Protocol
   ( BlockType(..)
+  , SomeBlockType (..)
+  , reflBlockType
   , Protocol(..)
   , ProtocolInfoArgs(..)
   , ProtocolClient(..)
@@ -17,6 +20,9 @@ module Cardano.Api.Protocol
 
 import           Cardano.Api.Modes
 
+import           Data.Bifunctor (bimap)
+
+import           Ouroboros.Consensus.Block.Forging (BlockForging)
 import           Ouroboros.Consensus.Cardano
 import           Ouroboros.Consensus.Cardano.Block
 import           Ouroboros.Consensus.Cardano.ByronHFC (ByronBlockHFC)
@@ -33,9 +39,11 @@ import           Ouroboros.Consensus.Shelley.Node.Praos
 import           Ouroboros.Consensus.Shelley.ShelleyHFC (ShelleyBlockHFC)
 import           Ouroboros.Consensus.Util.IOLike (IOLike)
 
+import           Type.Reflection ((:~:) (..))
+
 class (RunNode blk, IOLike m) => Protocol m blk where
-  data ProtocolInfoArgs m blk
-  protocolInfo :: ProtocolInfoArgs m blk -> ProtocolInfo m blk
+  data ProtocolInfoArgs blk
+  protocolInfo :: ProtocolInfoArgs blk -> (ProtocolInfo blk, m [BlockForging m blk])
 
 -- | Node client support for each consensus protocol.
 --
@@ -49,11 +57,13 @@ class RunNode blk => ProtocolClient blk where
 
 -- | Run PBFT against the Byron ledger
 instance IOLike m => Protocol m ByronBlockHFC where
-  data ProtocolInfoArgs m ByronBlockHFC = ProtocolInfoArgsByron ProtocolParamsByron
-  protocolInfo (ProtocolInfoArgsByron params) = inject $ protocolInfoByron params
+  data ProtocolInfoArgs ByronBlockHFC = ProtocolInfoArgsByron ProtocolParamsByron
+  protocolInfo (ProtocolInfoArgsByron params) = ( inject $ protocolInfoByron params
+                                                , pure . map inject $ blockForgingByron params
+                                                )
 
 instance (CardanoHardForkConstraints StandardCrypto, IOLike m) => Protocol m (CardanoBlock StandardCrypto) where
-  data ProtocolInfoArgs m (CardanoBlock StandardCrypto) =
+  data ProtocolInfoArgs (CardanoBlock StandardCrypto) =
          ProtocolInfoArgsCardano
            ProtocolParamsByron
           (ProtocolParamsShelleyBased StandardShelley)
@@ -119,11 +129,11 @@ instance ( IOLike m
                 (Consensus.TPraos StandardCrypto) (ShelleyEra StandardCrypto))
          )
   => Protocol m (ShelleyBlockHFC (Consensus.TPraos StandardCrypto) StandardShelley) where
-  data ProtocolInfoArgs m (ShelleyBlockHFC (Consensus.TPraos StandardCrypto) StandardShelley) = ProtocolInfoArgsShelley
+  data ProtocolInfoArgs (ShelleyBlockHFC (Consensus.TPraos StandardCrypto) StandardShelley) = ProtocolInfoArgsShelley
     (ProtocolParamsShelleyBased StandardShelley)
     (ProtocolParamsShelley StandardCrypto)
   protocolInfo (ProtocolInfoArgsShelley paramsShelleyBased paramsShelley) =
-    inject $ protocolInfoShelley paramsShelleyBased paramsShelley
+    bimap inject (fmap $ map inject) $ protocolInfoShelley paramsShelleyBased paramsShelley
 
 instance Consensus.LedgerSupportsProtocol
           (Consensus.ShelleyBlock
@@ -142,3 +152,14 @@ data BlockType blk where
 deriving instance Eq (BlockType blk)
 deriving instance Show (BlockType blk)
 
+reflBlockType :: BlockType blk -> BlockType blk' -> Maybe (blk :~: blk')
+reflBlockType ByronBlockType ByronBlockType     = Just Refl
+reflBlockType ShelleyBlockType ShelleyBlockType = Just Refl
+reflBlockType CardanoBlockType CardanoBlockType = Just Refl
+reflBlockType _                _                = Nothing
+
+
+data SomeBlockType where
+  SomeBlockType :: BlockType blk -> SomeBlockType
+
+deriving instance Show SomeBlockType

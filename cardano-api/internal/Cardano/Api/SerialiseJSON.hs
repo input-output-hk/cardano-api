@@ -19,7 +19,7 @@ import           Cardano.Api.Error
 import           Cardano.Api.HasTypeProxy
 
 import           Control.Monad.Trans.Except (runExceptT)
-import           Control.Monad.Trans.Except.Extra (firstExceptT, handleIOExceptT, hoistEither)
+import           Control.Monad.Trans.Except.Extra (firstExceptT, hoistEither)
 import           Data.Aeson (FromJSON (..), FromJSONKey, ToJSON (..), ToJSONKey)
 import qualified Data.Aeson as Aeson
 import           Data.Aeson.Encode.Pretty (encodePretty)
@@ -56,7 +56,7 @@ readFileJSON :: FromJSON a
              -> IO (Either (FileError JsonDecodeError) a)
 readFileJSON ttoken path =
     runExceptT $ do
-      content <- handleIOExceptT (FileIOError path) $ BS.readFile path
+      content <- fileIOExceptT path BS.readFile
       firstExceptT (FileError path) $ hoistEither $
         deserialiseFromJSON ttoken content
 
@@ -66,6 +66,5 @@ writeFileJSON :: ToJSON a
               -> IO (Either (FileError ()) ())
 writeFileJSON path x =
     runExceptT $
-      handleIOExceptT (FileIOError path) $
-        BS.writeFile path (serialiseToJSON x)
+      fileIOExceptT path (`BS.writeFile` serialiseToJSON x)
 

@@ -153,9 +153,9 @@ library internal
                       , mtl
                       , network
                       , optparse-applicative-fork
-                      , ouroboros-consensus >= 0.7
-                      , ouroboros-consensus-cardano >= 0.6
-                      , ouroboros-consensus-diffusion >= 0.6
+                      , ouroboros-consensus >= 0.9
+                      , ouroboros-consensus-cardano >= 0.7
+                      , ouroboros-consensus-diffusion >= 0.7
                       , ouroboros-consensus-protocol >= 0.5
                       , ouroboros-network
                       , ouroboros-network-api

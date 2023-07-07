@@ -41,7 +41,7 @@ import           Cardano.Api.Utils
 import           Cardano.Ledger.Binary (DecoderError)
 import qualified Cardano.Ledger.Binary as CBOR
 
-import           Control.Monad.Trans.Except.Extra (firstExceptT, handleIOExceptT, hoistEither,
+import           Control.Monad.Trans.Except.Extra (firstExceptT, hoistEither,
                    newExceptT, runExceptT)
 import           Data.Aeson
 import qualified Data.Aeson as Aeson
@@ -222,7 +222,7 @@ writeTxFileTextEnvelopeCddl
   -> IO (Either (FileError ()) ())
 writeTxFileTextEnvelopeCddl path tx =
   runExceptT $ do
-    handleIOExceptT (FileIOError (unFile path)) $ LBS.writeFile (unFile path) txJson
+    fileIOExceptT (unFile path) (`LBS.writeFile` txJson)
  where
   txJson = encodePretty' textEnvelopeCddlJSONConfig (serialiseTxLedgerCddl tx) <> "\n"
 
@@ -233,7 +233,7 @@ writeTxWitnessFileTextEnvelopeCddl
   -> IO (Either (FileError ()) ())
 writeTxWitnessFileTextEnvelopeCddl sbe path w =
   runExceptT $ do
-    handleIOExceptT (FileIOError (unFile path)) $ LBS.writeFile (unFile path) txJson
+    fileIOExceptT (unFile path) (`LBS.writeFile` txJson)
  where
   txJson = encodePretty' textEnvelopeCddlJSONConfig (serialiseWitnessLedgerCddl sbe w) <> "\n"
 
@@ -328,7 +328,6 @@ readTextEnvelopeCddlFromFile
   -> IO (Either (FileError TextEnvelopeCddlError) TextEnvelopeCddl)
 readTextEnvelopeCddlFromFile path =
   runExceptT $ do
-    bs <- handleIOExceptT (FileIOError path) $
-            readFileBlocking path
+    bs <- fileIOExceptT path readFileBlocking
     firstExceptT (FileError path . TextEnvelopeCddlAesonDecodeError path)
       . hoistEither $ Aeson.eitherDecodeStrict' bs

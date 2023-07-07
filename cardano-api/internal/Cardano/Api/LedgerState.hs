@@ -134,6 +134,7 @@ import qualified Cardano.Slotting.EpochInfo.API as Slot
 import           Cardano.Slotting.Slot (WithOrigin (At, Origin))
 import qualified Cardano.Slotting.Slot as Slot
 import qualified Ouroboros.Consensus.Block.Abstract as Consensus
+import           Ouroboros.Consensus.Block.Forging (BlockForging)
 import qualified Ouroboros.Consensus.Byron.Ledger.Block as Byron
 import qualified Ouroboros.Consensus.Byron.Ledger.Ledger as Byron
 import qualified Ouroboros.Consensus.Cardano as Consensus
@@ -772,7 +773,7 @@ genesisConfigToEnv
                 ]
         | otherwise ->
             let
-              topLevelConfig = Consensus.pInfoConfig (mkProtocolInfoCardano genCfg)
+              topLevelConfig = Consensus.pInfoConfig $ fst $ mkProtocolInfoCardano genCfg
             in
             Right $ Env
                   { envLedgerConfig = Consensus.topLevelConfigLedger topLevelConfig
@@ -912,7 +913,7 @@ readByteString fp cfgType = ExceptT $
 
 initLedgerStateVar :: GenesisConfig -> LedgerState
 initLedgerStateVar genesisConfig = LedgerState
-  { clsState = Ledger.ledgerState $ Consensus.pInfoInitLedger protocolInfo
+  { clsState = Ledger.ledgerState $ Consensus.pInfoInitLedger $ fst protocolInfo
   }
   where
     protocolInfo = mkProtocolInfoCardano genesisConfig
@@ -989,10 +990,11 @@ type NodeConfigFile = File NodeConfig
 
 mkProtocolInfoCardano ::
   GenesisConfig ->
-  Consensus.ProtocolInfo
-    IO
+  (Consensus.ProtocolInfo
     (HFC.HardForkBlock
             (Consensus.CardanoEras Consensus.StandardCrypto))
+  , IO [BlockForging IO (HFC.HardForkBlock
+                              (Consensus.CardanoEras Consensus.StandardCrypto))])
 mkProtocolInfoCardano (GenesisCardano dnc byronGenesis shelleyGenesis alonzoGenesis conwayGenesis)
   = Consensus.protocolInfoCardano
           Consensus.ProtocolParamsByron

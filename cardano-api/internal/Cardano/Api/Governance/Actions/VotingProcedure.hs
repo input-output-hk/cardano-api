@@ -103,10 +103,10 @@ data VoteChoice
   | Abst -- ^ Abstain
   deriving (Show, Eq)
 
-toVoterRole :: VoterType -> Gov.VoterRole
-toVoterRole CC = Gov.ConstitutionalCommittee
-toVoterRole DR = Gov.DRep
-toVoterRole SP = Gov.SPO
+toVoterRole :: VoterType -> Gov.Voter
+toVoterRole CC = Gov.CommitteeVoter
+toVoterRole DR = Gov.DRepVoter
+toVoterRole SP = Gov.StakePoolVoter
 
 toVote :: VoteChoice -> Gov.Vote
 toVote No = Gov.VoteNo
@@ -157,8 +157,7 @@ createVotingProcedure sbe vChoice vt (GovernanceActionIdentifier govActId) (Voti
   obtainEraCryptoConstraints sbe
     $ Vote $ Gov.VotingProcedure
       { Gov.vProcGovActionId = govActId
-      , Gov.vProcRole = toVoterRole vt
-      , Gov.vProcRoleKeyHash = govWitnessCredential
+      , Gov.vProcVoter = toVoterRole vt
       , Gov.vProcVote = toVote vChoice
       , Gov.vProcAnchor = SNothing -- TODO: Conway
       }

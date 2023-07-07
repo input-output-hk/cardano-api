@@ -707,6 +707,8 @@ module Cardano.Api (
 
     -- ** Protocol related types
     BlockType(..),
+    SomeBlockType (..),
+    reflBlockType,
     Protocol(..),
     ProtocolInfoArgs(..),
 
@@ -873,6 +875,7 @@ module Cardano.Api (
     queryCurrentEra,
     queryDebugLedgerState,
     queryEpoch,
+    queryConstitutionHash,
     queryEraHistory,
     queryGenesisParameters,
     queryPoolDistribution,
