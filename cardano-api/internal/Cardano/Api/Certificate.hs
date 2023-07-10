@@ -6,6 +6,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -91,34 +92,49 @@ import           Network.Socket (PortNumber)
 -- Certificates embedded in transactions
 --
 
-data Certificate era =
+data Certificate era where
+     -- Encompasses
+     --   1. Stake registration
+     --   2. Stake deregistration
+     --   3. Stake delegation
+     --   4. Pool retirement
+     --   5. Genesis delegation
+     --   6. MIR certificates
+     ShelleyRelatedCertificate
+       :: L.AtMostEra L.BabbageEra (ShelleyLedgerEra era)
+       => (Shelley.ShelleyTxCert (ShelleyLedgerEra era)) -> Certificate era
 
+   -- TODO: Phase out all of the constructors below
      -- Stake address certificates
-     StakeAddressRegistrationCertificate   StakeCredential
-   | StakeAddressDeregistrationCertificate StakeCredential
-   | StakeAddressPoolDelegationCertificate StakeCredential PoolId
+     StakeAddressRegistrationCertificate ::   StakeCredential -> Certificate era
+     StakeAddressDeregistrationCertificate :: StakeCredential -> Certificate era
+     StakeAddressPoolDelegationCertificate :: StakeCredential -> PoolId -> Certificate era
 
      -- Stake pool certificates
-   | StakePoolRegistrationCertificate StakePoolParameters
-   | StakePoolRetirementCertificate   PoolId EpochNo
+     StakePoolRegistrationCertificate  :: StakePoolParameters -> Certificate era
+     StakePoolRetirementCertificate    :: PoolId -> EpochNo -> Certificate era
 
      -- Special certificates
-   | GenesisKeyDelegationCertificate
-      (Hash GenesisKey)
-      (Hash GenesisDelegateKey)
-      (Hash VrfKey)
+     GenesisKeyDelegationCertificate
+      :: (Hash GenesisKey)
+      -> (Hash GenesisDelegateKey)
+      -> (Hash VrfKey)
+      -> Certificate era
 
-   | CommitteeDelegationCertificate
-      (Hash CommitteeColdKey)
-      (Hash CommitteeHotKey)
+     CommitteeDelegationCertificate
+      :: (Hash CommitteeColdKey)
+      -> (Hash CommitteeHotKey)
+      -> Certificate era
 
-   | CommitteeHotKeyDeregistrationCertificate
-      (Hash CommitteeColdKey)
+     CommitteeHotKeyDeregistrationCertificate
+      :: (Hash CommitteeColdKey)
+      -> Certificate era
+     MIRCertificate :: MIRPot -> MIRTarget -> Certificate era
 
-   | MIRCertificate MIRPot MIRTarget
-
-  deriving stock (Eq, Show)
   deriving anyclass SerialiseAsCBOR
+
+deriving instance Eq (Certificate era)
+deriving instance Show (Certificate era)
 
 instance Typeable era => HasTypeProxy (Certificate era) where
     data AsType (Certificate era) = AsCertificate
@@ -170,6 +186,15 @@ instance
   ) => HasTextEnvelope (Certificate era) where
     textEnvelopeType _ = "CertificateShelley"
     textEnvelopeDefaultDescr cert = case cert of
+      ShelleyRelatedCertificate (Shelley.ShelleyTxCertDelegCert Shelley.ShelleyRegCert{}) -> "Stake address registration"
+      ShelleyRelatedCertificate (Shelley.ShelleyTxCertDelegCert Shelley.ShelleyUnRegCert{}) -> "Stake address deregistration"
+      ShelleyRelatedCertificate (Shelley.ShelleyTxCertDelegCert Shelley.ShelleyDelegCert{}) -> "Stake address delegation"
+      ShelleyRelatedCertificate (Shelley.ShelleyTxCertPool Shelley.RetirePool{}) -> "Pool retirement"
+      ShelleyRelatedCertificate (Shelley.ShelleyTxCertPool Shelley.RegPool{}) -> "Pool registration"
+      ShelleyRelatedCertificate Shelley.ShelleyTxCertGenesisDeleg{} -> "Genesis key delegation"
+      ShelleyRelatedCertificate Shelley.ShelleyTxCertMir{} -> "MIR"
+
+      -- TODO: Phase out all of the constructors below
       StakeAddressRegistrationCertificate{}       -> "Stake address registration"
       StakeAddressDeregistrationCertificate{}     -> "Stake address deregistration"
       StakeAddressPoolDelegationCertificate{}     -> "Stake address stake pool delegation"
@@ -201,6 +226,7 @@ instance EraCast Certificate where
       pure $ CommitteeHotKeyDeregistrationCertificate coldKeyHash
     MIRCertificate mirPot mirTarget ->
       pure $ MIRCertificate mirPot mirTarget
+    rest -> error $ "eraCast: " <> show rest <>  " TODO: Conway era"
 
 -- | The 'MIRTarget' determines the target of a 'MIRCertificate'.
 -- A 'MIRCertificate' moves lovelace from either the reserves or the treasury
@@ -369,7 +395,7 @@ toShelleyCertificate sbe =
       obtainCertificateConstraints sbe toShelleyCertificateAtMostBabbage
     ShelleyBasedEraBabbage ->
       obtainCertificateConstraints sbe toShelleyCertificateAtMostBabbage
-    ShelleyBasedEraConway -> toShelleyCertificateAtLeastConway
+    ShelleyBasedEraConway -> toShelleyCertificateAtLeastConway sbe
 
 toShelleyCertificateAtMostBabbage :: ()
   => Shelley.EraCrypto (ShelleyLedgerEra era) ~ StandardCrypto
@@ -378,6 +404,11 @@ toShelleyCertificateAtMostBabbage :: ()
   => L.AtMostEra L.BabbageEra (ShelleyLedgerEra era)
   => Certificate era
   -> Shelley.TxCert (ShelleyLedgerEra era)
+
+toShelleyCertificateAtMostBabbage (ShelleyRelatedCertificate shelleyTxCert) = shelleyTxCert
+
+-- TODO: Eventually phase out everything below
+
 toShelleyCertificateAtMostBabbage (StakeAddressRegistrationCertificate stakecred) =
     Shelley.RegTxCert
         (toShelleyStakeCredential stakecred)
@@ -456,48 +487,50 @@ toShelleyCertificateAtMostBabbage (MIRCertificate mirPot (SendToTreasuryMIR amou
 toShelleyCertificateAtLeastConway :: ()
   => Shelley.EraCrypto (ShelleyLedgerEra era) ~ StandardCrypto
   => Conway.ConwayEraTxCert (ShelleyLedgerEra era)
-  => Certificate era
+  => ShelleyBasedEra era
+  -> Certificate era
   -> Shelley.TxCert (ShelleyLedgerEra era)
-toShelleyCertificateAtLeastConway (StakeAddressRegistrationCertificate stakecred) =
+toShelleyCertificateAtLeastConway era (ShelleyRelatedCertificate shelleyTxCert) = error "TODO: toShelleyCertificateAtLeastConway"
+toShelleyCertificateAtLeastConway era (StakeAddressRegistrationCertificate stakecred) =
     Shelley.RegTxCert
         (toShelleyStakeCredential stakecred)
 
-toShelleyCertificateAtLeastConway (StakeAddressDeregistrationCertificate stakecred) =
+toShelleyCertificateAtLeastConway era (StakeAddressDeregistrationCertificate stakecred) =
     Shelley.UnRegTxCert
         (toShelleyStakeCredential stakecred)
 
-toShelleyCertificateAtLeastConway (StakeAddressPoolDelegationCertificate
+toShelleyCertificateAtLeastConway era (StakeAddressPoolDelegationCertificate
                         stakecred (StakePoolKeyHash poolid)) =
     Shelley.DelegStakeTxCert
         (toShelleyStakeCredential stakecred)
         poolid
 
-toShelleyCertificateAtLeastConway (StakePoolRegistrationCertificate poolparams) =
+toShelleyCertificateAtLeastConway era (StakePoolRegistrationCertificate poolparams) =
     Shelley.RegPoolTxCert
         (toShelleyPoolParams poolparams)
 
-toShelleyCertificateAtLeastConway (StakePoolRetirementCertificate
+toShelleyCertificateAtLeastConway era (StakePoolRetirementCertificate
                        (StakePoolKeyHash poolid) epochno) =
     Shelley.RetirePoolTxCert
         poolid
         epochno
 
-toShelleyCertificateAtLeastConway (GenesisKeyDelegationCertificate _ _ _) =
+toShelleyCertificateAtLeastConway era (GenesisKeyDelegationCertificate _ _ _) =
     error "TODO CIP-1694 Delete this case"
 
-toShelleyCertificateAtLeastConway
+toShelleyCertificateAtLeastConway era
   ( CommitteeDelegationCertificate
     (CommitteeColdKeyHash _ckh)
     (CommitteeHotKeyHash  _hkh)
   ) = Conway.AuthCommitteeHotKeyTxCert (error "ckh") (error "hkh")
 
-toShelleyCertificateAtLeastConway
+toShelleyCertificateAtLeastConway era
   ( CommitteeHotKeyDeregistrationCertificate
     (CommitteeColdKeyHash _ckh)
   ) = error "TODO CIP-1694 Need ledger types for CommitteeHotKeyDeregistrationCertificate"
   -- ResignCommitteeColdTxCert
 
-toShelleyCertificateAtLeastConway (MIRCertificate _ _) =
+toShelleyCertificateAtLeastConway era (MIRCertificate _ _) =
     error "TODO CIP-1694 Delete this case"
 
 
