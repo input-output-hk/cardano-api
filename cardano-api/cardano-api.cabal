@@ -18,7 +18,7 @@ extra-doc-files:        README.md, CHANGELOG.md
 common project-config
   default-language:     Haskell2010
   default-extensions:   OverloadedStrings
-  build-depends:        base >= 4.14 && < 4.17
+  build-depends:        base >= 4.14 && < 4.19
 
   ghc-options:          -Wall
                         -Wcompat
@@ -152,7 +152,7 @@ library internal
                       , microlens
                       , mtl
                       , network
-                      , optparse-applicative-fork
+                      , optparse-applicative
                       , ouroboros-consensus >= 0.9
                       , ouroboros-consensus-cardano >= 0.7
                       , ouroboros-consensus-diffusion >= 0.7
