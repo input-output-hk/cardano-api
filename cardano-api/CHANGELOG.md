@@ -1,5 +1,17 @@
 # Changelog for cardano-api
 
+## 8.9.0.0
+
+- Export `withShelleyBasedEraConstraintsForLedger`
+  Use the ^>= version range operator for ledger and consensus libraries to avoid breaking changes affecting builds.
+  (feature; compatible)
+  [PR 108](https://github.com/input-output-hk/cardano-api/pull/108)
+
+- -  Update to the latest ledger and consensus
+  -  Introduce CommitteeKey
+  (feature; breaking)
+  [PR 99](https://github.com/input-output-hk/cardano-api/pull/99)
+
 ## 8.8.0.0
 
 - Add CastVerificationKeyRole StakePoolKey StakeKey instance
