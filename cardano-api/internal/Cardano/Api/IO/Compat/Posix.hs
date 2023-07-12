@@ -31,10 +31,15 @@ import           System.FilePath ((</>))
 import qualified System.IO as IO
 import           System.IO (Handle)
 import           System.Posix.Files (fileMode, getFileStatus, groupModes, intersectFileModes,
-                   nullFileMode, otherModes, ownerModes, ownerReadMode, setFdOwnerAndGroup,
-                   setFileMode)
+                   nullFileMode, otherModes, ownerReadMode, setFdOwnerAndGroup, setFileMode,
+                   stdFileMode)
+# if MIN_VERSION_unix(2,8,0)
+import           System.Posix.IO (OpenFileFlags (..), OpenMode (..), closeFd, defaultFileFlags,
+                   fdToHandle, openFd)
+#else
 import           System.Posix.IO (OpenMode (..), closeFd, defaultFileFlags, fdToHandle, openFd)
-import           System.Posix.Types (FileMode)
+#endif
+import           System.Posix.Types (Fd, FileMode)
 import           System.Posix.User (getRealUserID)
 import           Text.Printf (printf)
 
@@ -52,7 +57,7 @@ handleFileForWritingWithOwnerPermissionImpl path f = do
     -- it will be immediately turned into a Handle (which will be closed when
     -- the Handle is closed)
     bracketOnError
-      (openFd path WriteOnly (Just ownerModes) defaultFileFlags)
+      (openFileDescriptor path WriteOnly)
       closeFd
       (\fd -> setFdOwnerAndGroup fd user (-1) >> pure fd)
   case ownedFile of
@@ -95,3 +100,38 @@ checkVrfFilePermissionsImpl (File vrfPrivKey) = do
   hasGroupPermissions fm' = fm' `hasPermission` groupModes
 
 #endif
+
+-- | Opens a file from disk.
+openFileDescriptor :: FilePath -> OpenMode -> IO Fd
+# if MIN_VERSION_unix(2,8,0)
+openFileDescriptor fp openMode =
+    openFd fp openMode fileFlags
+  where
+    fileFlags =
+      case openMode of
+        ReadOnly ->
+          defaultFileFlags
+        ReadWrite ->
+          defaultFileFlags { creat = Just stdFileMode }
+        WriteOnly ->
+          defaultFileFlags { creat = Just stdFileMode }
+
+# else
+openFileDescriptor fp openMode =
+    openFd fp openMode fMode fileFlags
+  where
+    (fMode, fileFlags) =
+      case openMode of
+        ReadOnly ->
+          ( Nothing
+          , defaultFileFlags
+          )
+        ReadWrite ->
+          ( Just stdFileMode
+          , defaultFileFlags
+          )
+        WriteOnly ->
+          ( Just stdFileMode
+          , defaultFileFlags
+          )
+# endif

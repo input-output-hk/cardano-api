@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 
 module Test.Cardano.Api.Typed.RawBytes
@@ -84,7 +85,12 @@ roundtrip_raw_bytes asType g =
     H.tripping v serialiseToRawBytes (deserialiseFromRawBytes asType)
 
 roundtrip_verification_key_hash_raw
+#if __GLASGOW_HASKELL__ < 906
   :: (Key keyrole, Eq (Hash keyrole), Show (Hash keyrole))
+#else
+  -- GHC 9.6 needs an extra constraint.
+  :: (Key keyrole, Eq (Hash keyrole), Show (Hash keyrole), HasTypeProxy keyrole)
+#endif
   => AsType keyrole -> Property
 roundtrip_verification_key_hash_raw roletoken =
   H.property $ do
